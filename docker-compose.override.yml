@@ -39,6 +39,8 @@ services:
       # Linux 容器内 inotify 事件常常收不到，改用 polling 保证热更新触发
       CHOKIDAR_USEPOLLING: "true"
       WATCHPACK_POLLING: "true"
+      # 开发模式下浏览器直连宿主机映射出的后端端口（与生产模式的 nginx 反代不同）
+      REACT_APP_API_URL: "http://localhost:3001"
       # 开发服务器 WebSocket 通过 3000 端口暴露，避免 HMR 连不上
       WDS_SOCKET_PORT: 0
     ports: !override

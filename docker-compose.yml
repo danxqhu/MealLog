@@ -13,15 +13,14 @@ services:
   # MySQL 数据库
   mysql:
     image: mysql:8.0
-    container_name: meal-log-mysql
     restart: unless-stopped
     environment:
       MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-meallog_password}
       MYSQL_DATABASE: meal_log
       MYSQL_USER: ${DB_USER:-mealuser}
       MYSQL_PASSWORD: ${DB_PASSWORD:-meallog_password}
-    ports:
-      - "127.0.0.1:3306:3306"
+    # 不映射 MySQL 到宿主机：backend 通过内部网络以服务名 mysql 访问数据库，
+    # 多实例部署时避免 3306 端口冲突；如需宿主机调试可临时加 "13306:3306" 映射
     volumes:
       - mysql_data:/var/lib/mysql
     networks:
@@ -38,8 +37,8 @@ services:
       context: ./backend
       dockerfile: Dockerfile
       target: production
-    image: meallog-backend:latest
-    container_name: meal-log-backend
+    # 不写 image/container_name：镜像与容器名由 compose 按项目名(-p)自动生成，
+    # 同一台服务器可部署多个互不冲突的实例
     restart: unless-stopped
     environment:
       NODE_ENV: production
@@ -50,7 +49,8 @@ services:
       DB_NAME: meal_log
       JWT_SECRET: ${JWT_SECRET:-your_jwt_secret_key}
     ports:
-      - "3001:3001"
+      # 宿主机端口可用 BACKEND_PORT 覆盖（多实例部署时每个实例配置不同端口）
+      - "${BACKEND_PORT:-3001}:3001"
     depends_on:
       mysql:
         condition: service_healthy
@@ -63,11 +63,10 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       target: production
-    image: meallog-frontend:latest
-    container_name: meal-log-frontend
     restart: unless-stopped
     ports:
-      - "3000:80"
+      # 宿主机端口可用 FRONTEND_PORT 覆盖（多实例部署时每个实例配置不同端口）
+      - "${FRONTEND_PORT:-3000}:80"
     depends_on:
       - backend
     networks:

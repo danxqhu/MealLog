@@ -1,4 +1,7 @@
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+// 生产模式下走相对路径，由 nginx 反代到后端（见 frontend/nginx.conf 的 /api/ 代理），
+// 这样同一台服务器部署多个实例时前端无需在构建期烘焙不同的后端地址；
+// 本地开发时用 docker-compose.override.yml 里的 REACT_APP_API_URL 指到宿主机端口
+const API_URL = process.env.REACT_APP_API_URL || '';
 
 // 获取带 token 的请求头
 const getAuthHeaders = () => {
