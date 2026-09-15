@@ -1,0 +1,252 @@
+/* YearMonthPicker 容器 */
+.ymp-container {
+  position: relative;
+  display: inline-block;
+}
+
+/* 触发按钮 */
+.ymp-trigger {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border: 2px solid #e9ecef;
+  border-radius: 8px;
+  background: white;
+  color: #333;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.25s;
+  white-space: nowrap;
+}
+
+.ymp-trigger:hover {
+  border-color: #667eea;
+}
+
+.ymp-trigger-text {
+  min-width: 70px;
+  text-align: center;
+}
+
+.ymp-arrow {
+  font-size: 12px;
+  transition: transform 0.25s;
+  color: #999;
+}
+
+.ymp-arrow.open {
+  transform: rotate(180deg);
+}
+
+/* 下拉面板 */
+.ymp-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 100;
+  min-width: 260px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+  border: 1px solid #e9ecef;
+  overflow: hidden;
+  animation: ymp-slide-in 0.2s ease;
+}
+
+@keyframes ymp-slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 顶部导航栏 */
+.ymp-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-bottom: 1px solid #f0f0f0;
+  background: #fafbfc;
+}
+
+.ymp-nav-btn {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: #667eea;
+  font-size: 20px;
+  font-weight: bold;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: background 0.2s;
+}
+
+.ymp-nav-btn:hover:not(:disabled) {
+  background: #eef1ff;
+}
+
+.ymp-nav-btn:disabled {
+  color: #ccc;
+  cursor: not-allowed;
+}
+
+.ymp-year-label {
+  border: none;
+  background: transparent;
+  font-size: 15px;
+  font-weight: 600;
+  color: #333;
+  cursor: pointer;
+  padding: 4px 12px;
+  border-radius: 6px;
+  transition: background 0.2s;
+}
+
+.ymp-year-label:hover {
+  background: #eef1ff;
+  color: #667eea;
+}
+
+/* 网格（月份 / 季度） */
+.ymp-grid {
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+}
+
+.month-grid {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.quarter-grid {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.ymp-cell {
+  padding: 10px 0;
+  border: 1.5px solid transparent;
+  border-radius: 8px;
+  background: #f8f9fa;
+  color: #555;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.ymp-cell:hover {
+  background: #eef1ff;
+  border-color: #c3ccff;
+  color: #667eea;
+}
+
+.ymp-cell.active {
+  background: #667eea;
+  color: white;
+  border-color: #667eea;
+  font-weight: 600;
+}
+
+/* 年份选择列表 */
+.ymp-years-view {
+  display: flex;
+  flex-direction: column;
+}
+
+.ymp-years-header {
+  padding: 8px 12px;
+  border-bottom: 1px solid #f0f0f0;
+  background: #fafbfc;
+}
+
+.ymp-back-btn {
+  border: none;
+  background: transparent;
+  color: #667eea;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: background 0.2s;
+}
+
+.ymp-back-btn:hover {
+  background: #eef1ff;
+}
+
+.ymp-years-list {
+  max-height: 220px;
+  overflow-y: auto;
+  padding: 6px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+}
+
+.ymp-years-list::-webkit-scrollbar {
+  width: 5px;
+}
+
+.ymp-years-list::-webkit-scrollbar-thumb {
+  background: #d0d5dd;
+  border-radius: 3px;
+}
+
+.year-item {
+  padding: 10px 0;
+  border: 1.5px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: #555;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.year-item:hover {
+  background: #eef1ff;
+  border-color: #c3ccff;
+  color: #667eea;
+}
+
+.year-item.active {
+  background: #667eea;
+  color: white;
+  border-color: #667eea;
+  font-weight: 600;
+}
+
+/* 移动端适配 */
+@media (max-width: 600px) {
+  .ymp-trigger {
+    padding: 8px 12px;
+    font-size: 13px;
+  }
+
+  .ymp-panel {
+    min-width: 230px;
+  }
+
+  .ymp-cell {
+    padding: 8px 0;
+    font-size: 12px;
+  }
+
+  .year-item {
+    padding: 8px 0;
+    font-size: 13px;
+  }
+}

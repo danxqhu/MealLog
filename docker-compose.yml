@@ -1,0 +1,82 @@
+# =============================================================================
+# 基础配置 = 生产模式（nginx + node，无热更新，稳定低开销）
+#
+# 日常开发：直接 `docker-compose up -d`
+#   → docker-compose 会自动加载同目录下的 docker-compose.override.yml，
+#     切换到 nodemon / react-scripts 热更新模式，无需手动改配置。
+#
+# 纯生产部署：`docker-compose -f docker-compose.yml up -d --build`
+#   → 显式只加载本文件，跳过 override，得到 nginx 静态托管 + node 直启。
+# =============================================================================
+
+services:
+  # MySQL 数据库
+  mysql:
+    image: mysql:8.0
+    container_name: meal-log-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-meallog_password}
+      MYSQL_DATABASE: meal_log
+      MYSQL_USER: ${DB_USER:-mealuser}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-meallog_password}
+    ports:
+      - "127.0.0.1:3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - meal-log-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # 后端服务（生产模式：node 直接启动）
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: production
+    image: meallog-backend:latest
+    container_name: meal-log-backend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USER: ${DB_USER:-mealuser}
+      DB_PASSWORD: ${DB_PASSWORD:-meallog_password}
+      DB_NAME: meal_log
+      JWT_SECRET: ${JWT_SECRET:-your_jwt_secret_key}
+    ports:
+      - "3001:3001"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - meal-log-network
+
+  # 前端服务（生产模式：nginx 托管打包后的静态资源）
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: production
+    image: meallog-frontend:latest
+    container_name: meal-log-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    networks:
+      - meal-log-network
+
+volumes:
+  mysql_data:
+    driver: local
+
+networks:
+  meal-log-network:
+    driver: bridge

@@ -1,0 +1,56 @@
+# =============================================================================
+# 开发覆盖层（由 docker-compose 自动加载，无需 -f 指定）
+#
+# 作用：在基础的生产配置之上，无缝叠加“热更新能力”。
+#   - 后端切换到 nodemon（target=development），并挂载 src / package.json
+#   - 前端切换到 React 开发服务器（target=development），并挂载 src / public
+#   - 端口回到开发常用映射：前端 3000:3000
+#
+# 使用方式：
+#   日常：docker-compose up -d --build   ← 自动 = 生产基线 + 热更新
+#   纯生产：docker-compose -f docker-compose.yml up -d --build   ← 跳过本文件
+# =============================================================================
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: development
+    image: meallog-backend:dev
+    environment:
+      NODE_ENV: development
+    volumes:
+      # 只挂 src 与 package.json，node_modules 保留容器内已装好的依赖
+      - ./backend/src:/app/src
+      - ./backend/package.json:/app/package.json
+      - backend_node_modules:/app/node_modules
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: development
+    image: meallog-frontend:dev
+    environment:
+      NODE_ENV: development
+      # Docker 里必须关闭 CRA 尝试自动打开浏览器
+      BROWSER: none
+      # Linux 容器内 inotify 事件常常收不到，改用 polling 保证热更新触发
+      CHOKIDAR_USEPOLLING: "true"
+      WATCHPACK_POLLING: "true"
+      # 开发服务器 WebSocket 通过 3000 端口暴露，避免 HMR 连不上
+      WDS_SOCKET_PORT: 0
+    ports: !override
+      # 覆盖基础文件里的 3000:80（nginx），改为 dev server 的 3000:3000
+      # 使用 !override 标签避免与基础配置中的 ports 列表发生合并冲突
+      - "3000:3000"
+    volumes:
+      - ./frontend/src:/app/src
+      - ./frontend/public:/app/public
+      - ./frontend/package.json:/app/package.json
+      - frontend_node_modules:/app/node_modules
+
+volumes:
+  backend_node_modules:
+  frontend_node_modules:

@@ -1,0 +1,371 @@
+.calendar-container {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  padding: 20px;
+}
+
+.calendar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.calendar-header h2 {
+  margin: 0;
+  font-size: 24px;
+  color: #333;
+}
+
+.nav-button {
+  background: #667eea;
+  color: white;
+  border: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  font-size: 20px;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.nav-button:hover {
+  background: #5568d3;
+  transform: scale(1.1);
+}
+
+.calendar-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.calendar-weekdays div {
+  text-align: center;
+  font-weight: bold;
+  color: #667eea;
+  padding: 10px;
+  font-size: 14px;
+}
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 10px;
+}
+
+.calendar-day {
+  min-height: 100px;
+  padding: 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.calendar-day.empty {
+  background: transparent;
+  cursor: default;
+}
+
+.calendar-day.no-meal {
+  background: #f8f9fa;
+  border: 2px solid #e9ecef;
+}
+
+.calendar-day.has-meal {
+  background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+  border: 2px solid #667eea;
+}
+
+/* 免费用餐 - 红色背景格子 */
+.calendar-day.free-meal {
+  background: #ff5252;
+  border: 2px solid #d32f2f;
+}
+
+.calendar-day.free-meal .day-number {
+  color: #fff;
+}
+
+/* 今天高亮 - 琥珀色 */
+.calendar-day.today {
+  border: 2px solid #d4915c;
+  position: relative;
+  box-shadow: 0 0 0 1px rgba(212, 145, 92, 0.3);
+}
+
+.calendar-day.today::after {
+  content: '';
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 6px;
+  height: 6px;
+  background: #d4915c;
+  border-radius: 50%;
+}
+
+.calendar-day.today.no-meal {
+  background: #fdf2e6;
+  border: 2px solid #d4915c;
+}
+
+.calendar-day.today.has-meal {
+  background: linear-gradient(135deg, #fce4c4 0%, #f5dfca 100%);
+  border: 2px solid #d4915c;
+}
+
+.calendar-day.today.free-meal {
+  background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);
+  border: 2px solid #d4915c;
+}
+
+.calendar-day.today .day-number {
+  color: #b87333;
+  font-weight: 800;
+}
+
+/* 今天快捷按钮 */
+.calendar-today-bar {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 12px;
+}
+
+.today-button {
+  background: #fdf2e6;
+  color: #b87333;
+  border: 1px solid #e0b88a;
+  padding: 5px 16px;
+  border-radius: 16px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.today-button:hover {
+  background: #fce4c4;
+  border-color: #d4915c;
+}
+
+.calendar-day:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.day-number {
+  font-size: 18px;
+  font-weight: bold;
+  color: #333;
+}
+
+.meal-info {
+  font-size: 12px;
+  overflow: hidden;
+  width: 100%;
+}
+
+.meal-count {
+  color: #667eea;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.meal-amount {
+  color: #764ba2;
+  font-weight: bold;
+  font-size: 9px;
+  white-space: nowrap;
+  max-width: 100%;
+  display: block;
+}
+
+/* 免费用餐大面积显示 */
+.meal-free-area {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+}
+
+.meal-free-text {
+  font-size: 26px;
+  font-weight: 900;
+  color: #fff;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  background: transparent;
+}
+
+.no-eating {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+}
+
+.no-eating-text {
+  font-size: 24px;
+  color: #ccc;
+}
+
+.calendar-legend {
+  display: flex;
+  justify-content: center;
+  gap: 30px;
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid #eee;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: #666;
+}
+
+.legend-color {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+}
+
+.legend-color.has-meal-legend {
+  background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+  border: 2px solid #667eea;
+}
+
+.legend-color.no-meal-legend {
+  background: #f8f9fa;
+  border: 2px solid #e9ecef;
+}
+
+.legend-color.free-meal-legend {
+  background: linear-gradient(135deg, #43a047, #66bb6a);
+  border: 2px solid #43a047;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+}
+
+.legend-color.today-legend {
+  background: #fdf2e6;
+  border: 2px solid #d4915c;
+}
+
+/* 移动端适配 */
+@media (max-width: 600px) {
+  .calendar-container {
+    padding: 10px;
+    border-radius: 8px;
+  }
+
+  .calendar-header {
+    margin-bottom: 10px;
+  }
+
+  .calendar-header h2 {
+    font-size: 18px;
+  }
+
+  .calendar-today-bar {
+    margin-bottom: 8px;
+  }
+
+  .today-button {
+    padding: 4px 12px;
+    font-size: 12px;
+  }
+
+  .nav-button {
+    width: 32px;
+    height: 32px;
+    font-size: 16px;
+  }
+
+  .calendar-weekdays {
+    gap: 2px;
+    margin-bottom: 5px;
+  }
+
+  .calendar-weekdays div {
+    padding: 5px 2px;
+    font-size: 12px;
+  }
+
+  .calendar-grid {
+    gap: 3px;
+  }
+
+  .calendar-day {
+    min-height: 56px;
+    padding: 4px;
+    border-radius: 6px;
+  }
+
+  .calendar-day:hover {
+    transform: none;
+    box-shadow: none;
+  }
+
+  .day-number {
+    font-size: 13px;
+  }
+
+  .meal-info {
+    font-size: 9px;
+  }
+
+  .meal-count {
+    font-size: 9px;
+  }
+
+  .meal-amount {
+    font-size: 8px;
+  }
+
+  .meal-free-badge {
+    font-size: 9px;
+    padding: 1px 4px;
+    border-radius: 6px;
+    letter-spacing: 0;
+  }
+
+  .no-eating-text {
+    font-size: 16px;
+  }
+
+  .calendar-legend {
+    gap: 15px;
+    margin-top: 10px;
+    padding-top: 10px;
+    font-size: 12px;
+  }
+
+  .legend-color {
+    width: 16px;
+    height: 16px;
+  }
+}
+
+/* 超小屏幕适配 (iPhone SE 375px) */
+@media (max-width: 375px) {
+  .meal-amount {
+    font-size: 6px;
+  }
+}
