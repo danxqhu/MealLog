@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import './Login.css';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+const API_URL = process.env.REACT_APP_API_URL || '';
+// 生产模式回退到相对路径，由 nginx 反代到后端，避免把 localhost 烘焙进产物
 
 const Register = ({ onLogin, onGoLogin }) => {
   const [username, setUsername] = useState('');
