@@ -46,7 +46,50 @@ docker-compose up -d --build
    - 后端API：http://localhost:3001
    - MySQL数据库：localhost:3306
 
-### 方式二：本地开发
+### 方式二：云服务器部署（本地构建 + 一键部署，小内存 ECS 专用）
+
+免费/低配 ECS 内存不足以在服务器上执行前端构建（`react-scripts build` 会直接 OOM 卡死），
+因此采用"本地构建、只传打包产物"的流程：
+
+```
+本地 Mac                              云服务器 (ECS)
+────────                              ──────────────
+npm run build + 推送 deploy 分支  ──►  ./deploy.sh（自动拉取+部署）
+```
+
+**本地发布（每次更新，在 Mac 上执行）：**
+
+```bash
+cd frontend && npm run build && cd ..
+
+git checkout -B deploy main   # 从最新 main 重建 deploy 分支
+git add -f frontend/build     # build 被 .gitignore 忽略，必须加 -f
+git commit -m "release: 构建产物"
+git push -f origin deploy     # deploy 是发布专用分支，强推是安全的
+git checkout main             # 回到主分支继续开发
+```
+
+**服务器首次部署（只需一次）：**
+
+```bash
+git clone --depth 1 -b deploy https://github.com/danxqhu/MealLog.git meallog
+cd meallog
+cp .env.example .env && vim .env   # 修改数据库密码和 JWT_SECRET
+chmod +x deploy.sh && ./deploy.sh
+```
+
+**之后每次更新（服务器上只需一条命令）：**
+
+```bash
+cd meallog && ./deploy.sh    # 脚本自动拉取 deploy 分支最新代码并部署
+```
+
+- `deploy` 分支 = 最新代码 + 前端打包产物，服务器克隆它即可，无需碰主分支
+- 服务器上前端镜像 = nginx + 静态文件（秒级构建，零 npm 构建），后端只装 6 个生产依赖
+- 主分支 `main` 保持干净，构建产物不进入主分支历史
+- `deploy.sh` 用 `git fetch + reset --hard` 同步代码，兼容 deploy 分支强推重写历史（不会动服务器上的 .env）
+
+### 方式三：本地开发
 
 #### 后端设置
 
@@ -93,6 +136,7 @@ MealLog/
 │   ├── package.json
 │   └── Dockerfile
 ├── docker-compose.yml
+├── deploy.sh              # 服务器部署：自动拉取 deploy 分支并一键部署
 └── README.md
 ```
 

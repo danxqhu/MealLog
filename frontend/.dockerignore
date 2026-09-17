@@ -1,3 +1,4 @@
 node_modules
 npm-debug.log
-build
+# 注意：build/ 不能排除 —— 生产镜像（production target）直接 COPY build 静态产物，
+# 该产物由本地 release.sh 构建并随 deploy 分支发布

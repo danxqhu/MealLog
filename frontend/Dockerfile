@@ -1,23 +1,19 @@
 # 前端 Dockerfile（多阶段：支持 production / development 两种 target）
-# - 生产：docker-compose.yml 使用 target=production，nginx 提供打包后的静态资源
-# - 开发：docker-compose.override.yml 使用 target=development，React 开发服务器热更新
+# - 生产：target=production，nginx 直接托管本地已打包好的 build/ 静态资源。
+#   服务器上不再执行 npm run build（避免低内存机器构建卡死），
+#   build/ 由本地 release.sh 构建并随 deploy 分支发布。
+# - 开发：target=development，React 开发服务器热更新
 
-# ---------- 依赖安装层（两种 target 共用） ----------
+# ---------- 依赖安装层（development target 使用） ----------
 FROM node:18-alpine AS deps
 WORKDIR /app
 COPY package*.json ./
 RUN npm install
 
 
-# ---------- 构建层（生产 target 使用） ----------
-FROM deps AS builder
-COPY . .
-RUN npm run build
-
-
-# ---------- 生产阶段：nginx 托管 build 产物 ----------
+# ---------- 生产阶段：nginx 托管打包产物（纯静态，服务器零构建） ----------
 FROM nginx:alpine AS production
-COPY --from=builder /app/build /usr/share/nginx/html
+COPY build /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]
