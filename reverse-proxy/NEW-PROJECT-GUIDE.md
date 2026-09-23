@@ -14,7 +14,7 @@
 | Docker + docker-compose 已安装 | ✅ | 见各业务项目的 deploy.sh |
 | 共享网络 `meal-log-network` 已创建 | ✅ | 第一个业务启动时自动创建，或手动 `docker network create meal-log-network` |
 | 总反向代理 `reverse-proxy` 已启动 | ✅ | 独占宿主机 80/443，SSL 终止、http→https 跳转、按 Host 分流 |
-| Cloudflare 泛域名证书 `*.xxx.cc` 已上传到 `reverse-proxy/cert/` | ✅ | Origin 证书，必须保持 DNS 橙色云朵开启 |
+| Cloudflare 泛域名证书 `*.meallog.eu.cc` 已上传到 `reverse-proxy/cert/` | ✅ | Origin 证书，必须保持 DNS 橙色云朵开启 |
 | Oracle 云安全组 + 服务器 ufw 已放行 80/443 | ✅ | 业务端口（如 3000/3001）**不对外** |
 
 ---
@@ -45,6 +45,11 @@
 ├── .env.example
 └── deploy.sh               # 一键部署脚本（可选）
 ```
+
+> **域名规划示例**：
+> - 主域名：`meallog.eu.cc`
+> - MealLog 应用：`meallog.meallog.eu.cc`
+> - 新项目 app2：`app2.meallog.eu.cc`
 
 ---
 
@@ -243,7 +248,7 @@ CMD ["npx", "nodemon", "src/index.js"]
 
 ## 六、服务器部署步骤（新项目）
 
-假设新项目叫 `app2`，二级域名 `app2.xxx.cc`：
+假设新项目叫 `app2`，二级域名 `app2.meallog.eu.cc`：
 
 ### 1. 本地构建前端产物（在 Mac 上）
 
@@ -292,14 +297,14 @@ cd /home/ubuntu/reverse-proxy
 # 复制 MealLog 的配置作为模板
 cp conf/10-meal-log.conf conf/20-app2.conf
 
-# 修改 4 处（用 vim 或 sed）：
-#   1. server_name app2.xxx.cc
+# 修改 3 处（用 vim 或 sed）：
+#   1. server_name app2.meallog.eu.cc
 #   2. proxy_pass http://app2-frontend:80  ← 注意：这里要写 app2 项目的服务名
 #      如果 app2 的 docker-compose.yml 里服务名也叫 frontend，则写 http://frontend:80
 #      但多个项目的服务名都是 frontend 会 DNS 冲突！
-#      ⚠️ 解决方案见下方"服务名冲突处理"
-#   3. 证书文件名（如果是泛域名证书 *.xxx.cc，则无需改）
-#   4. 注释里的项目名
+#      ⚠️ 解决方案见下方“服务名冲突处理”
+#   3. 注释里的项目名（可选）
+# 证书文件名无需改（泛域名证书 *.meallog.eu.cc 自动覆盖所有二级域名）
 ```
 
 ### 5. 重启总反向代理
@@ -313,7 +318,7 @@ docker-compose restart
 ### 6. Cloudflare DNS 添加 A 记录
 
 - 类型：A
-- 名称：`app2`（即 `app2.xxx.cc`）
+- 名称：`app2`（即 `app2.meallog.eu.cc`）
 - 内容：服务器公网 IP
 - **代理状态：橙色云朵（已代理）** ← 必须！灰色会证书报错
 
@@ -321,10 +326,10 @@ docker-compose restart
 
 ```bash
 # 服务器上执行
-curl -Ik http://app2.xxx.cc        # 应返回 301 跳到 https
-curl -Ik https://app2.xxx.cc       # 应返回 200
+curl -Ik http://app2.meallog.eu.cc        # 应返回 301 跳到 https
+curl -Ik https://app2.meallog.eu.cc       # 应返回 200
 
-# 浏览器无痕模式打开 https://app2.xxx.cc
+# 浏览器无痕模式打开 https://app2.meallog.eu.cc
 ```
 
 ---
@@ -461,7 +466,7 @@ cd app2
 |---|---|---|
 | 项目目录名 | 小写，无空格 | `app2`、`my-blog` |
 | docker-compose 服务名 | 建议加项目前缀 | `app2-frontend`、`app2-backend`、`app2-mysql` |
-| 二级域名 | 项目名.主域名 | `app2.xxx.cc` |
+| 二级域名 | 项目名.主域名 | `app2.meallog.eu.cc` |
 | 数据库名 | 项目名_db | `app2_db` |
 | 数据库用户 | 项目名user | `app2user` |
 | 环境变量文件 | `.env`（不提交 git） | 从 `.env.example` 复制 |
