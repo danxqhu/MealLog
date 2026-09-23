@@ -21,35 +21,39 @@
 
 ## 二、新项目目录结构模板
 
-假设新项目叫 `app2`，在服务器上创建独立目录（**不要放在现有业务目录内**）：
+假设新项目叫 `app2`，在服务器上创建独立目录（**不要放在现有业务目录内，也不要放在 reverse-proxy 内**）：
 
 ```
-/home/ubuntu/app2/
-├── backend/
-│   ├── src/
-│   │   └── index.js
+/home/ubuntu/
+├── reverse-proxy/          ← 独立总代理（管理所有应用）
+│   ├── docker-compose.yml
+│   ├── conf/
+│   └── cert/
+├── meallog/                ← MealLog 业务项目
+├── app2/                   ← 新项目（独立目录）
+│   ├── backend/
+│   │   ├── src/
+│   │   │   └── index.js
+│   │   ├── .env
+│   │   ├── .env.example
+│   │   ├── Dockerfile
+│   │   └── package.json
+│   ├── frontend/
+│   │   ├── src/
+│   │   ├── public/
+│   │   ├── build/              # 本地构建产物，随 deploy 分支提交
+│   │   ├── nginx.conf          # 业务侧纯 HTTP nginx 配置
+│   │   ├── Dockerfile
+│   │   └── package.json
+│   ├── docker-compose.yml
+│   ├── docker-compose.override.yml   # 本地热更新层（可选）
 │   ├── .env
 │   ├── .env.example
-│   ├── Dockerfile
-│   └── package.json
-├── frontend/
-│   ├── src/
-│   ├── public/
-│   ├── build/              # 本地构建产物，随 deploy 分支提交
-│   ├── nginx.conf          # 业务侧纯 HTTP nginx 配置
-│   ├── Dockerfile
-│   └── package.json
-├── docker-compose.yml
-├── docker-compose.override.yml   # 本地热更新层（可选）
-├── .env
-├── .env.example
-└── deploy.sh               # 一键部署脚本（可选）
+│   └── deploy.sh               # 一键部署脚本（可选）
+└── app3/                   ← 未来第三个业务项目
 ```
 
-> **域名规划示例**：
-> - 主域名：`meallog.eu.cc`
-> - MealLog 应用：`meallog.meallog.eu.cc`
-> - 新项目 app2：`app2.meallog.eu.cc`
+> **重要**：每个业务项目都是独立目录，互不干扰。reverse-proxy 也是独立目录，不在任何业务项目内。
 
 ---
 
@@ -289,9 +293,12 @@ docker-compose ps
 docker network inspect meal-log-network   # 应看到 app2 的 3 个容器
 ```
 
+> **注意**：如果报 `network meal-log-network not found`，说明 MealLog 还没启动过。先启动 MealLog（会自动创建网络），或手动执行 `docker network create meal-log-network`。
+
 ### 4. 在总反向代理中添加新站点的 nginx 配置
 
 ```bash
+# 注意：reverse-proxy 是独立目录，不在任何业务项目内
 cd /home/ubuntu/reverse-proxy
 
 # 复制 MealLog 的配置作为模板
