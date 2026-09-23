@@ -33,6 +33,12 @@ Thumbs.db
 # 注：docker-compose.override.yml 是本地热更新配置，不含敏感信息，
 # 纳入版本管理以便 clone 后开箱即用热更新
 
+# 反向代理证书私钥（绝不可提交到仓库！）
+reverse-proxy/cert/*.crt
+reverse-proxy/cert/*.key
+reverse-proxy/cert/*.pem
+!reverse-proxy/cert/.gitkeep
+
 # Database
 *.sql
 !backend/init.sql

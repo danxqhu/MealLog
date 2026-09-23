@@ -1,0 +1,42 @@
+# =============================================================================
+# 独立总反向代理 —— 统一接管宿主机 80/443 与全部 SSL 证书
+#
+# 职责：
+#   - 80 端口：全部 http 请求 301 跳转 https
+#   - 443 端口：加载泛域名证书，按二级域名 Host 分流到各业务容器（纯内网 http）
+#
+# 与业务项目的关系：
+#   - 业务容器（如 MealLog 的 meallog-frontend）不映射任何宿主机端口，
+#     只接入下方共享网络 meal-log-network
+#   - 该网络由 MealLog 的 docker-compose.yml 创建（固定网络名，不带项目前缀）。
+#     若尚未创建（代理先于任何业务启动），先执行：
+#       docker network create meal-log-network
+#
+# 新增业务三步走：
+#   1. 业务 compose 加入 meal-log-network（external: true），不暴露宿主机端口
+#   2. DNS 添加 A 记录：新二级域名 → 服务器公网 IP
+#   3. 复制 conf/10-meal-log.conf 为新文件，改 server_name 与 proxy_pass 后
+#      docker-compose restart
+# =============================================================================
+
+services:
+  nginx:
+    image: nginx:alpine
+    container_name: reverse-proxy
+    restart: unless-stopped
+    ports:
+      # 全服务器仅此一处占用 80/443
+      - "80:80"
+      - "443:443"
+    volumes:
+      # 站点配置按二级域名拆文件，挂载整个 conf.d
+      - ./conf:/etc/nginx/conf.d:ro
+      # 泛域名证书（*.xxx.cc 的 crt 与 key，文件名自定，与 conf 中引用保持一致）
+      - ./cert:/etc/nginx/cert:ro
+    networks:
+      - meal-log-network
+
+networks:
+  # 共享业务网络：由 MealLog compose 创建，这里以外部网络方式接入
+  meal-log-network:
+    external: true

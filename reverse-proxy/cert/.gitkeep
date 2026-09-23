@@ -1,0 +1,7 @@
+# 本目录用于存放泛域名证书（如 xxx.cc.crt 与 xxx.cc.key）。
+# 真实证书文件已被 .gitignore 排除，绝不提交到仓库！
+# 部署时通过 scp 或手动上传到此目录，文件名需与 conf/ 中 ssl_certificate 引用一致。
+#
+# Cloudflare Origin 证书：在 Cloudflare 控制台 SSL/TLS → Origin Server 生成，
+# 有效期最长 15 年。注意必须保持 DNS 记录【橙色云朵】（代理开启），
+# 灰色直连模式下浏览器不信任 Origin 证书。

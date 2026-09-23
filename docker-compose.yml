@@ -37,8 +37,9 @@ services:
       context: ./backend
       dockerfile: Dockerfile
       target: production
-    # 不写 image/container_name：镜像与容器名由 compose 按项目名(-p)自动生成，
-    # 同一台服务器可部署多个互不冲突的实例
+    # 不写 container_name：容器名由 compose 自动生成，同一网络内总反向代理
+    # 通过服务名 backend:3001 即可访问（compose 网络内置 DNS 解析服务名），
+    # 避免固定容器名导致未来多实例部署冲突
     restart: unless-stopped
     environment:
       NODE_ENV: production
@@ -48,9 +49,8 @@ services:
       DB_PASSWORD: ${DB_PASSWORD:-meallog_password}
       DB_NAME: meal_log
       JWT_SECRET: ${JWT_SECRET:-your_jwt_secret_key}
-    ports:
-      # 宿主机端口可用 BACKEND_PORT 覆盖（多实例部署时每个实例配置不同端口）
-      - "${BACKEND_PORT:-3001}:3001"
+    # 不映射宿主机端口：仅 frontend 容器经内网代理访问 backend:3001，
+    # 对外访问统一由独立总反向代理（仓库 reverse-proxy/ 目录）接管 80/443
     depends_on:
       mysql:
         condition: service_healthy
@@ -63,10 +63,11 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       target: production
+    # 不写 container_name：总反向代理通过服务名 frontend:80 内网访问
+    # （compose 网络内置 DNS 按服务名解析），固定容器名会让多实例部署冲突
     restart: unless-stopped
-    ports:
-      # 宿主机端口可用 FRONTEND_PORT 覆盖（多实例部署时每个实例配置不同端口）
-      - "${FRONTEND_PORT:-3000}:80"
+    # 不映射宿主机端口：对外由总反向代理按二级域名转发进来（见 reverse-proxy/ 目录），
+    # 临时调试可手动加回 "3000:80"
     depends_on:
       - backend
     networks:
@@ -77,5 +78,8 @@ volumes:
     driver: local
 
 networks:
+  # 使用固定网络名（不带 compose 项目名前缀），与独立总反向代理共享：
+  # 总代理 compose 中以 external: true 引用同名网络即可接入本应用
   meal-log-network:
+    name: meal-log-network
     driver: bridge

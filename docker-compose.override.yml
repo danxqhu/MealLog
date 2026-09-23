@@ -20,6 +20,10 @@ services:
     image: meallog-backend:dev
     environment:
       NODE_ENV: development
+    ports: !override
+      # 开发模式浏览器直连宿主机映射的后端端口（生产基线已不再映射端口，
+      # 前端 dev server 通过 REACT_APP_API_URL=http://localhost:3001 访问）
+      - "3001:3001"
     volumes:
       # 只挂 src 与 package.json，node_modules 保留容器内已装好的依赖
       - ./backend/src:/app/src
