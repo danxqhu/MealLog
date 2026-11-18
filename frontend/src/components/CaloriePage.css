@@ -1,0 +1,993 @@
+.calorie-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* ==================== 迷你日历 ==================== */
+.calorie-calendar {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  padding: 16px 20px;
+}
+
+.calorie-calendar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.calorie-calendar-header h3 {
+  margin: 0;
+  font-size: 18px;
+  color: #333;
+}
+
+.calorie-calendar-header .nav-button {
+  background: #f0844a;
+  width: 30px;
+  height: 30px;
+  font-size: 15px;
+}
+
+.calorie-calendar-header .nav-button:hover {
+  background: #e06a30;
+}
+
+.calorie-calendar-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.actions-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: nowrap;
+}
+
+.food-admin-button {
+  background: white;
+  color: #f0844a;
+  border: 1px solid #f0a868;
+  padding: 4px 10px;
+  border-radius: 14px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: all 0.2s;
+}
+
+.food-admin-button:hover {
+  background: #fff4ec;
+  border-color: #f0844a;
+}
+
+.goal-button {
+  background: white;
+  color: #2e7d32;
+  border: 1px solid #81c784;
+  padding: 4px 10px;
+  border-radius: 14px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: all 0.2s;
+}
+
+.goal-button:hover {
+  background: #f1f8e9;
+  border-color: #2e7d32;
+}
+
+/* ==================== 目标达标状态条 ==================== */
+
+.goal-loading {
+  color: #999;
+  font-size: 12px;
+  text-align: center;
+  padding: 20px 0;
+}
+
+/* 每人目标对比行 */
+.person-goal-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 4px;
+  background: white;
+  border-radius: 10px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
+  padding: 5px 10px;
+  overflow: hidden;
+}
+
+.person-goal-name {
+  font-size: 11px;
+  font-weight: 700;
+  color: #555;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.person-goal-item {
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: 8px;
+  background: #f5f5f5;
+  color: #666;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.person-goal-item.ok {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.person-goal-item.over {
+  background: #fdecea;
+  color: #d32f2f;
+  font-weight: 600;
+}
+
+.person-goal-item.no-goal {
+  color: #aaa;
+}
+
+/* 目标弹窗成员卡片 */
+.person-card {
+  border: 1px solid #f0e2d6;
+  border-radius: 8px;
+  padding: 7px 9px;
+  margin-top: 6px;
+  background: #fffdfb;
+}
+
+.person-card-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: #f0844a;
+  margin-bottom: 4px;
+}
+
+/* ==================== 食物库编辑弹窗 ==================== */
+.food-admin-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 16px;
+}
+
+.food-admin-modal {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+  width: 100%;
+  max-width: 480px;
+  max-height: 85vh;
+  overflow-y: auto;
+}
+
+.food-admin-body {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.food-admin-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.food-admin-header h3 {
+  margin: 0;
+  font-size: 14px;
+  color: #333;
+}
+
+.modal-close {
+  background: transparent;
+  border: none;
+  font-size: 14px;
+  color: #888;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+
+.modal-close:hover {
+  background: #f5f5f5;
+  color: #333;
+}
+
+.admin-note {
+  background: #fdf6ec;
+  border: 1px solid #f0dcb8;
+  color: #a07838;
+  border-radius: 6px;
+  padding: 5px 8px;
+  font-size: 11px;
+}
+
+.calorie-calendar-actions .today-button {
+  background: #fdf2e6;
+  color: #b87333;
+  border: 1px solid #e0b88a;
+}
+
+/* 单位切换 */
+.unit-toggle {
+  display: flex;
+  border: 1px solid #f0844a;
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.unit-toggle button {
+  background: white;
+  color: #f0844a;
+  border: none;
+  padding: 4px 8px;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s;
+}
+
+.unit-toggle button.active {
+  background: #f0844a;
+  color: white;
+  font-weight: 600;
+}
+
+.calorie-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 3px;
+  margin-bottom: 1px;
+}
+
+.calorie-weekdays div {
+  text-align: center;
+  font-weight: bold;
+  color: #f0844a;
+  padding: 0;
+  font-size: 8px;
+  line-height: 1.1;
+}
+
+.calorie-mini-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 3px;
+}
+
+.mini-day {
+  min-height: 19px;
+  padding: 0 2px;
+  border-radius: 5px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: #f8f9fa;
+  border: 1px solid #e9ecef;
+  transition: all 0.2s;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.mini-day.empty {
+  background: transparent;
+  border: none;
+  cursor: default;
+}
+
+.mini-day:hover {
+  border-color: #f0844a;
+}
+
+.mini-day.has-data {
+  background: linear-gradient(135deg, #ffe8d6 0%, #ffd3e0 100%);
+  border: 1px solid #f0a868;
+}
+
+.mini-day.today {
+  border: 2px solid #d4915c;
+  box-shadow: 0 0 0 1px rgba(212, 145, 92, 0.3);
+}
+
+.mini-day.selected {
+  outline: 2px solid #f0844a;
+  outline-offset: -1px;
+  font-weight: bold;
+}
+
+.mini-day-number {
+  font-size: 8px;
+  color: #333;
+  line-height: 1;
+}
+
+.mini-day.today .mini-day-number {
+  color: #b87333;
+  font-weight: 800;
+}
+
+.mini-day-kcal {
+  font-size: 7px;
+  color: #d9541b;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+/* ==================== 当日合计条 ==================== */
+.calorie-day-summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: white;
+  border-radius: 10px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
+  padding: 10px 16px;
+  flex-wrap: nowrap;
+  gap: 8px;
+  overflow: hidden;
+}
+
+.summary-date {
+  font-size: 15px;
+  font-weight: 600;
+  color: #333;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.summary-total {
+  font-size: 15px;
+  font-weight: 700;
+  color: #d9541b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.summary-target {
+  font-size: 13px;
+  font-weight: 600;
+  color: #888;
+  margin-left: 4px;
+  white-space: nowrap;
+}
+
+.summary-badge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.summary-badge.ok {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.summary-badge.over {
+  background: #d32f2f;
+  color: white;
+}
+
+.calorie-day-summary.over {
+  background: #fff5f5;
+  box-shadow: 0 2px 10px rgba(211, 47, 47, 0.15);
+}
+
+.calorie-day-summary.over .summary-total {
+  color: #d32f2f;
+}
+
+.calorie-day-summary.over .summary-target {
+  color: #d32f2f;
+}
+
+/* ==================== 四餐区块 ==================== */
+.meal-sections {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.meal-section {
+  background: white;
+  border-radius: 10px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.07);
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.meal-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #ffe8d6;
+  padding-bottom: 4px;
+}
+
+.meal-section-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #333;
+}
+
+.meal-section-total {
+  font-size: 12px;
+  font-weight: 700;
+  color: #d9541b;
+}
+
+.entry-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.entry-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  padding: 2px 4px;
+  border-radius: 5px;
+  background: #fafafa;
+}
+
+.entry-row:hover {
+  background: #fff4ec;
+}
+
+.entry-food-name {
+  flex: 1;
+  color: #333;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.entry-portion {
+  color: #888;
+  white-space: nowrap;
+}
+
+.entry-kcal {
+  color: #d9541b;
+  font-weight: 600;
+  white-space: nowrap;
+  min-width: 60px;
+  text-align: right;
+}
+
+.icon-button {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 1px 3px;
+  border-radius: 4px;
+  opacity: 0.6;
+  transition: all 0.2s;
+}
+
+.icon-button:hover {
+  opacity: 1;
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.editing-row .portion-input {
+  width: 70px;
+}
+
+.entry-error {
+  color: #d32f2f;
+  font-size: 11px;
+}
+
+/* ==================== 添加食物 ==================== */
+.add-food-button {
+  background: transparent;
+  border: 1px dashed #f0a868;
+  color: #f0844a;
+  border-radius: 6px;
+  padding: 4px 0;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  width: 100%;
+}
+
+.add-food-button:hover {
+  background: #fff4ec;
+  border-color: #f0844a;
+}
+
+.add-food-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: #fdf8f4;
+  border: 1px solid #f5dcc8;
+  border-radius: 8px;
+  padding: 8px;
+}
+
+.food-search-input {
+  border: 1px solid #e0cbb8;
+  border-radius: 6px;
+  padding: 5px 8px;
+  font-size: 12px;
+  outline: none;
+}
+
+.food-search-input:focus {
+  border-color: #f0844a;
+}
+
+.food-results {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 180px;
+  overflow-y: auto;
+  border: 1px solid #f0e2d6;
+  border-radius: 6px;
+  background: white;
+}
+
+.food-results li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  font-size: 12px;
+  cursor: pointer;
+  border-bottom: 1px solid #f7f0ea;
+}
+
+.food-results li:last-child {
+  border-bottom: none;
+}
+
+.food-results li:hover {
+  background: #fff4ec;
+}
+
+.food-result-name {
+  color: #333;
+}
+
+.food-result-info {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.food-result-macros {
+  color: #999;
+  font-size: 10px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.food-result-energy {
+  color: #d9541b;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.food-not-found-hint {
+  font-size: 11px;
+  color: #a07838;
+  background: #fdf6ec;
+  border: 1px solid #f0dcb8;
+  border-radius: 6px;
+  padding: 5px 8px;
+}
+
+.add-new-food-link {
+  background: transparent;
+  border: 1px dashed #f0a868;
+  color: #f0844a;
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.add-new-food-link:hover {
+  background: #fff4ec;
+  border-color: #f0844a;
+}
+
+/* 新增食物表单 */
+.create-food-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: white;
+  border: 1px solid #f0e2d6;
+  border-radius: 6px;
+  padding: 8px;
+}
+
+.create-food-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  flex-wrap: wrap;
+}
+
+.create-food-label {
+  color: #888;
+  min-width: 62px;
+}
+
+.create-food-label.required::before {
+  content: '*';
+  color: #d32f2f;
+  margin-right: 3px;
+}
+
+.create-food-name {
+  font-weight: 600;
+  color: #333;
+}
+
+.food-name-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.create-food-row input {
+  border: 1px solid #e0cbb8;
+  border-radius: 6px;
+  padding: 3px 6px;
+  font-size: 12px;
+  width: 80px;
+  outline: none;
+}
+
+.create-food-row input:focus {
+  border-color: #f0844a;
+}
+
+.create-food-per {
+  color: #888;
+  font-size: 11px;
+}
+
+.segment-toggle {
+  display: flex;
+  border: 1px solid #f0844a;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.segment-toggle button {
+  background: white;
+  color: #f0844a;
+  border: none;
+  padding: 3px 8px;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.segment-toggle button.active {
+  background: #f0844a;
+  color: white;
+  font-weight: 600;
+}
+
+.create-food-actions,
+.add-food-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.btn-primary {
+  background: #f0844a;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 5px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: #e06a30;
+}
+
+.btn-primary:disabled {
+  background: #f0d5c2;
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  background: white;
+  color: #888;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  padding: 5px 12px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.btn-secondary:hover {
+  background: #f5f5f5;
+}
+
+.btn-danger {
+  background: white;
+  color: #d32f2f;
+  border: 1px solid #ef9a9a;
+  border-radius: 6px;
+  padding: 5px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  margin-left: auto;
+  transition: all 0.2s;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: #d32f2f;
+  color: white;
+  border-color: #d32f2f;
+}
+
+.btn-danger:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.admin-success-notice {
+  background: #e8f5e9;
+  border: 1px solid #a5d6a7;
+  color: #2e7d32;
+  border-radius: 6px;
+  padding: 5px 8px;
+  font-size: 11px;
+}
+
+/* 分量输入行 */
+.portion-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  flex-wrap: wrap;
+  background: white;
+  border: 1px solid #f0e2d6;
+  border-radius: 6px;
+  padding: 6px 8px;
+}
+
+.selected-food-name {
+  color: #333;
+  font-weight: 600;
+}
+
+.selected-food-energy {
+  color: #888;
+  font-weight: 400;
+  font-size: 12px;
+}
+
+.selected-food-macros {
+  display: block;
+  color: #999;
+  font-weight: 400;
+  font-size: 10px;
+}
+
+.portion-input {
+  border: 1px solid #e0cbb8;
+  border-radius: 6px;
+  padding: 3px 6px;
+  font-size: 12px;
+  width: 100px;
+  outline: none;
+}
+
+.portion-input:focus {
+  border-color: #f0844a;
+}
+
+.portion-preview {
+  color: #d9541b;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.entry-portion-unit {
+  color: #888;
+  font-size: 12px;
+}
+
+/* ==================== 移动端适配 ==================== */
+@media (max-width: 768px) {
+  .meal-sections {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 600px) {
+  .calorie-calendar {
+    padding: 10px 12px;
+  }
+
+  .actions-right {
+    /* 窄屏下目标/编辑食物库/单位切换保持一行，不折行 */
+    flex-wrap: nowrap;
+    justify-content: flex-end;
+    min-width: 0;
+  }
+
+  .calorie-calendar-actions .today-button {
+    flex-shrink: 0;
+  }
+
+  .goal-button,
+  .food-admin-button {
+    padding: 3px 5px;
+    font-size: 10px;
+  }
+
+  .unit-toggle {
+    font-size: 10px;
+  }
+
+  .unit-toggle button {
+    padding: 3px 4px;
+    font-size: 10px;
+  }
+
+  /* 窄屏单位切换只显示 kcal/kJ，保证操作栏一行放下 */
+  .unit-zh {
+    display: none;
+  }
+
+  .calorie-calendar-actions {
+    /* 今天 + 目标 + 编辑食物库 + 单位切换保持同一行 */
+    flex-wrap: nowrap;
+    gap: 4px;
+  }
+
+  .food-admin-modal {
+    max-width: 100%;
+  }
+
+  .calorie-calendar-header h3 {
+    font-size: 15px;
+  }
+
+  .mini-day {
+    min-height: 16px;
+    padding: 0 1px;
+  }
+
+  .mini-day-number {
+    font-size: 7px;
+  }
+
+  .mini-day-kcal {
+    font-size: 6px;
+  }
+
+  .calorie-weekdays div {
+    font-size: 7px;
+  }
+
+  .calorie-day-summary {
+    padding: 6px 10px;
+    gap: 6px;
+  }
+
+  .person-goal-row {
+    padding: 4px 6px;
+    gap: 2px;
+  }
+
+  .person-goal-name {
+    font-size: 9px;
+  }
+
+  .person-goal-item {
+    font-size: 8px;
+    padding: 1px 3px;
+    border-radius: 6px;
+  }
+
+  .summary-date {
+    font-size: 11px;
+  }
+
+  .summary-total {
+    font-size: 11px;
+  }
+
+  .summary-target {
+    font-size: 10px;
+    margin-left: 2px;
+  }
+
+  .summary-badge {
+    font-size: 9px;
+    padding: 1px 5px;
+    margin-left: 3px;
+  }
+
+  .meal-section {
+    padding: 6px 8px;
+    gap: 3px;
+  }
+
+  .meal-section-title {
+    font-size: 12px;
+  }
+
+  .meal-section-total {
+    font-size: 11px;
+  }
+
+  .entry-row {
+    font-size: 11px;
+    padding: 1px 3px;
+    gap: 4px;
+  }
+
+  .entry-kcal {
+    min-width: 52px;
+    font-size: 11px;
+  }
+
+  .add-food-button {
+    padding: 3px 0;
+    font-size: 11px;
+  }
+}

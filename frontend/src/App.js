@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import './App.css';
 import { useAuth } from './AuthContext';
 import Calendar from './components/Calendar';
 import StatsChart from './components/StatsChart';
+import CaloriePage from './components/CaloriePage';
 import MealModal from './components/MealModal';
 import Login from './components/Login';
 import Register from './components/Register';
@@ -17,8 +18,16 @@ function App() {
   const [selectedDate, setSelectedDate] = useState(null);
   const [meals, setMeals] = useState([]);
   const [showModal, setShowModal] = useState(false);
-  const [viewMode, setViewMode] = useState('calendar');
+  // 记住上次使用的页签（存 localStorage，刷新/隔天打开都回到离开前的页面）
+  const [viewMode, setViewMode] = useState(() => {
+    const saved = localStorage.getItem('mealLogViewMode');
+    return ['calendar', 'stats', 'calorie'].includes(saved) ? saved : 'calendar';
+  });
   const [refreshKey, setRefreshKey] = useState(0);
+
+  useEffect(() => {
+    localStorage.setItem('mealLogViewMode', viewMode);
+  }, [viewMode]);
 
   // 加载中
   if (loading) {
@@ -118,6 +127,12 @@ function App() {
           >
             📊 统计
           </button>
+          <button
+            className={viewMode === 'calorie' ? 'active' : ''}
+            onClick={() => setViewMode('calorie')}
+          >
+            🔥 卡路里
+          </button>
         </div>
       </header>
 
@@ -130,6 +145,8 @@ function App() {
             onMonthChange={setCurrentDate}
             refreshKey={refreshKey}
           />
+        ) : viewMode === 'calorie' ? (
+          <CaloriePage currentDate={currentDate} onMonthChange={setCurrentDate} />
         ) : (
           <StatsChart currentDate={currentDate} />
         )}

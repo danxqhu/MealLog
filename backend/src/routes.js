@@ -364,4 +364,525 @@ router.get('/stats/first-year', async (req, res) => {
   }
 });
 
+// ==================== 卡路里相关接口 ====================
+
+const KCAL_PER_KJ = 1 / 4.184; // 1 kJ = 0.239 kcal
+const VALID_MEAL_TYPES = ['breakfast', 'lunch', 'dinner', 'snack'];
+
+// 搜索食物库（全局共享），排序：精确匹配 > 当前用户最近使用时间 > 名称字母序
+router.get('/foods', async (req, res) => {
+  try {
+    const search = (req.query.search || '').trim();
+    const userId = req.userId;
+    const foodColumns = 'f.id, f.name, f.energy_per_100, f.food_type, f.protein_per_100, f.fat_per_100, f.carb_per_100';
+    let rows;
+    if (search) {
+      [rows] = await pool.execute(
+        `SELECT ${foodColumns}, MAX(c.created_at) AS last_used
+         FROM food_items f
+         LEFT JOIN calorie_entries c ON c.food_id = f.id AND c.user_id = ?
+         WHERE f.name LIKE ?
+         GROUP BY f.id
+         ORDER BY (f.name = ?) DESC, last_used DESC, f.name ASC
+         LIMIT 30`,
+        [userId, `%${search}%`, search]
+      );
+    } else {
+      [rows] = await pool.execute(
+        `SELECT ${foodColumns}, MAX(c.created_at) AS last_used
+         FROM food_items f
+         LEFT JOIN calorie_entries c ON c.food_id = f.id AND c.user_id = ?
+         GROUP BY f.id
+         ORDER BY last_used DESC, f.name ASC
+         LIMIT 30`,
+        [userId]
+      );
+    }
+    const parseNum = v => (v === null || v === undefined) ? null : parseFloat(v);
+    const parsed = rows.map(({ last_used, ...r }) => ({
+      ...r,
+      energy_per_100: parseNum(r.energy_per_100),
+      protein_per_100: parseNum(r.protein_per_100),
+      fat_per_100: parseNum(r.fat_per_100),
+      carb_per_100: parseNum(r.carb_per_100)
+    }));
+    res.json({ success: true, data: parsed });
+  } catch (error) {
+    console.error('Error searching foods:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// 添加食物到食物库（支持 kcal/kJ 输入，能量统一换算为 kcal 存储；三大营养素可选，单位克/每100）
+router.post('/foods', async (req, res) => {
+  try {
+    const { name, energy_per_100, unit, food_type, protein_per_100, fat_per_100, carb_per_100 } = req.body;
+
+    if (!name || !name.trim()) {
+      return res.status(400).json({ success: false, message: '食物名称不能为空' });
+    }
+
+    if (energy_per_100 === undefined || energy_per_100 === null || energy_per_100 === '') {
+      return res.status(400).json({ success: false, message: '请填写每100克/毫升的热量' });
+    }
+
+    const validType = food_type === 'liquid' ? 'liquid' : 'solid';
+    const validUnit = unit === 'kJ' ? 'kJ' : 'kcal';
+
+    let value = parseFloat(energy_per_100);
+    if (isNaN(value) || value < 0) {
+      return res.status(400).json({ success: false, message: '热量值不能为负数' });
+    }
+    if (value > 10000) {
+      return res.status(400).json({ success: false, message: '热量值不能大于 10000' });
+    }
+
+    // 统一换算为 kcal 存储
+    if (validUnit === 'kJ') {
+      value = value * KCAL_PER_KJ;
+    }
+
+    const foodName = name.trim();
+
+    // 解析必填的三大营养素：未填报错，非空校验范围
+    const macroValues = [];
+    for (const [label, raw] of [['蛋白质', protein_per_100], ['脂肪', fat_per_100], ['碳水化合物', carb_per_100]]) {
+      if (raw === undefined || raw === null || raw === '') {
+        return res.status(400).json({ success: false, message: `请填写${label}含量` });
+      }
+      const num = parseFloat(raw);
+      if (isNaN(num) || num < 0 || num > 100) {
+        return res.status(400).json({ success: false, message: `${label}需在 0-100 克之间` });
+      }
+      macroValues.push(num.toFixed(2));
+    }
+
+    // 同名食物已存在时直接返回已有记录，避免唯一键冲突；若传了营养素且库里缺失则补全
+    const [existing] = await pool.execute(
+      'SELECT id, name, energy_per_100, food_type, protein_per_100, fat_per_100, carb_per_100 FROM food_items WHERE name = ?',
+      [foodName]
+    );
+    if (existing.length > 0) {
+      const item = existing[0];
+      const parseNum = v => (v === null || v === undefined) ? null : parseFloat(v);
+      if (macroValues.some(v => v !== null)) {
+        await pool.execute(
+          `UPDATE food_items SET
+            protein_per_100 = COALESCE(protein_per_100, ?),
+            fat_per_100 = COALESCE(fat_per_100, ?),
+            carb_per_100 = COALESCE(carb_per_100, ?)
+           WHERE name = ?`,
+          [...macroValues, foodName]
+        );
+        const [updated] = await pool.execute(
+          'SELECT id, name, energy_per_100, food_type, protein_per_100, fat_per_100, carb_per_100 FROM food_items WHERE name = ?',
+          [foodName]
+        );
+        const u = updated[0];
+        return res.json({
+          success: true,
+          message: '食物已存在，直接使用',
+          data: { ...u, energy_per_100: parseNum(u.energy_per_100), protein_per_100: parseNum(u.protein_per_100), fat_per_100: parseNum(u.fat_per_100), carb_per_100: parseNum(u.carb_per_100) }
+        });
+      }
+      return res.json({
+        success: true,
+        message: '食物已存在，直接使用',
+        data: { ...item, energy_per_100: parseNum(item.energy_per_100), protein_per_100: parseNum(item.protein_per_100), fat_per_100: parseNum(item.fat_per_100), carb_per_100: parseNum(item.carb_per_100) }
+      });
+    }
+
+    const [result] = await pool.execute(
+      'INSERT INTO food_items (name, energy_per_100, food_type, protein_per_100, fat_per_100, carb_per_100) VALUES (?, ?, ?, ?, ?, ?)',
+      [foodName, value.toFixed(2), validType, macroValues[0], macroValues[1], macroValues[2]]
+    );
+
+    res.status(201).json({
+      success: true,
+      message: '食物添加成功',
+      data: {
+        id: result.insertId,
+        name: foodName,
+        energy_per_100: value,
+        food_type: validType,
+        protein_per_100: macroValues[0] === null ? null : parseFloat(macroValues[0]),
+        fat_per_100: macroValues[1] === null ? null : parseFloat(macroValues[1]),
+        carb_per_100: macroValues[2] === null ? null : parseFloat(macroValues[2])
+      }
+    });
+  } catch (error) {
+    console.error('Error adding food:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// 编辑食物库（能量/类型/三大营养素，全局生效；名称不可改避免历史记录失联）
+router.put('/foods/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { energy_per_100, unit, food_type, protein_per_100, fat_per_100, carb_per_100 } = req.body;
+
+    if (energy_per_100 === undefined || energy_per_100 === null || energy_per_100 === '') {
+      return res.status(400).json({ success: false, message: '请填写每100克/毫升的热量' });
+    }
+
+    const validType = food_type === 'liquid' ? 'liquid' : 'solid';
+    const validUnit = unit === 'kJ' ? 'kJ' : 'kcal';
+
+    let value = parseFloat(energy_per_100);
+    if (isNaN(value) || value < 0) {
+      return res.status(400).json({ success: false, message: '热量值不能为负数' });
+    }
+    if (value > 10000) {
+      return res.status(400).json({ success: false, message: '热量值不能大于 10000' });
+    }
+
+    // 统一换算为 kcal 存储
+    if (validUnit === 'kJ') {
+      value = value * KCAL_PER_KJ;
+    }
+
+    const macroValues = [];
+    for (const [label, raw] of [['蛋白质', protein_per_100], ['脂肪', fat_per_100], ['碳水化合物', carb_per_100]]) {
+      if (raw === undefined || raw === null || raw === '') {
+        return res.status(400).json({ success: false, message: `请填写${label}含量` });
+      }
+      const num = parseFloat(raw);
+      if (isNaN(num) || num < 0 || num > 100) {
+        return res.status(400).json({ success: false, message: `${label}需在 0-100 克之间` });
+      }
+      macroValues.push(num.toFixed(2));
+    }
+
+    const [result] = await pool.execute(
+      'UPDATE food_items SET energy_per_100 = ?, food_type = ?, protein_per_100 = ?, fat_per_100 = ?, carb_per_100 = ? WHERE id = ?',
+      [value.toFixed(4), validType, macroValues[0], macroValues[1], macroValues[2], id]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ success: false, message: '食物不存在' });
+    }
+
+    const [updated] = await pool.execute(
+      'SELECT id, name, energy_per_100, food_type, protein_per_100, fat_per_100, carb_per_100 FROM food_items WHERE id = ?',
+      [id]
+    );
+    const parseNum = v => (v === null || v === undefined) ? null : parseFloat(v);
+    const u = updated[0];
+    res.json({
+      success: true,
+      message: '食物更新成功',
+      data: {
+        ...u,
+        energy_per_100: parseNum(u.energy_per_100),
+        protein_per_100: parseNum(u.protein_per_100),
+        fat_per_100: parseNum(u.fat_per_100),
+        carb_per_100: parseNum(u.carb_per_100)
+      }
+    });
+  } catch (error) {
+    console.error('Error updating food:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// 删除食物（所有用户引用该食物的卡路里记录由外键 CASCADE 自动删除，日历合计同步减少）
+router.delete('/foods/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const [foods] = await pool.execute('SELECT id, name FROM food_items WHERE id = ?', [id]);
+    if (foods.length === 0) {
+      return res.status(404).json({ success: false, message: '食物不存在' });
+    }
+
+    // 统计将被连带删除的记录数，用于前端提示
+    const [countRows] = await pool.execute(
+      'SELECT COUNT(*) as cnt FROM calorie_entries WHERE food_id = ?',
+      [id]
+    );
+
+    await pool.execute('DELETE FROM food_items WHERE id = ?', [id]);
+
+    res.json({
+      success: true,
+      message: '食物已删除',
+      data: { name: foods[0].name, affectedEntries: Number(countRows[0].cnt) }
+    });
+  } catch (error) {
+    console.error('Error deleting food:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// ==================== 每日营养目标接口 ====================
+
+// 可选数值字段解析：空 → null，非空校验范围
+const parseOptional = (raw, min, max, label) => {
+  if (raw === undefined || raw === null || raw === '') return { value: null };
+  const num = parseFloat(raw);
+  if (isNaN(num) || num < min || num > max) {
+    return { error: `${label}需在 ${min}-${max} 之间` };
+  }
+  return { value: num };
+};
+
+// 获取当前账号的目标设置（人数 + 每人的身体信息与目标；未设置过返回默认 people_count=2、空成员）
+router.get('/goals', async (req, res) => {
+  try {
+    const [profiles] = await pool.execute('SELECT people_count FROM user_profiles WHERE user_id = ?', [req.userId]);
+    const peopleCount = profiles.length === 0 ? 2 : parseInt(profiles[0].people_count);
+
+    const [rows] = await pool.execute(
+      'SELECT * FROM user_persons WHERE user_id = ? AND person_seq <= ? ORDER BY person_seq ASC',
+      [req.userId, peopleCount]
+    );
+    const parseNum = v => (v === null || v === undefined) ? null : parseFloat(v);
+    const persons = rows.map(g => ({
+      seq: parseInt(g.person_seq),
+      name: g.name,
+      gender: g.gender,
+      age: g.age === null ? null : parseInt(g.age),
+      height_cm: parseNum(g.height_cm),
+      weight_kg: parseNum(g.weight_kg),
+      target_kcal: parseNum(g.target_kcal),
+      target_carb: parseNum(g.target_carb),
+      target_protein: parseNum(g.target_protein),
+      target_fat: parseNum(g.target_fat)
+    }));
+
+    res.json({ success: true, data: { people_count: peopleCount, persons } });
+  } catch (error) {
+    console.error('Error fetching goals:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// 保存账号目标设置（人数 + 每人的身体信息与目标，整体覆盖；热量支持 kcal/kJ 输入统一存 kcal）
+router.put('/goals', async (req, res) => {
+  try {
+    const { people_count, persons } = req.body;
+
+    const peopleCount = parseInt(people_count);
+    if (![1, 2].includes(peopleCount)) {
+      return res.status(400).json({ success: false, message: '记录人数只能是 1 或 2' });
+    }
+    if (!Array.isArray(persons) || persons.length > peopleCount) {
+      return res.status(400).json({ success: false, message: '成员数量与记录人数不匹配' });
+    }
+    const unit = req.body.unit === 'kJ' ? 'kJ' : 'kcal';
+
+    // 逐个成员校验并解析
+    const parsed = [];
+    for (let i = 0; i < peopleCount; i++) {
+      const p = persons[i] || {};
+
+      const parsedName = (p.name === undefined || p.name === null || String(p.name).trim() === '')
+        ? null : String(p.name).trim().slice(0, 20);
+      const parsedGender = ['male', 'female'].includes(p.gender) ? p.gender : null;
+
+      const checks = [
+        ['年龄', parseOptional(p.age, 1, 120, '年龄')],
+        ['身高', parseOptional(p.height_cm, 50, 250, '身高')],
+        ['体重', parseOptional(p.weight_kg, 20, 500, '体重')],
+        ['热量目标', parseOptional(p.target_kcal, 1, 20000, '热量目标')],
+        ['碳水目标', parseOptional(p.target_carb, 0, 1000, '碳水目标')],
+        ['蛋白质目标', parseOptional(p.target_protein, 0, 1000, '蛋白质目标')],
+        ['脂肪目标', parseOptional(p.target_fat, 0, 1000, '脂肪目标')],
+      ];
+      for (const [, r] of checks) {
+        if (r.error) return res.status(400).json({ success: false, message: `成员${i + 1}：${r.error}` });
+      }
+
+      // 热量统一换算为 kcal 存储
+      let kcalValue = checks[3][1].value;
+      if (kcalValue !== null && unit === 'kJ') {
+        kcalValue = kcalValue * KCAL_PER_KJ;
+      }
+
+      const fmt = v => (v === null ? null : Number(v).toFixed(2));
+      parsed.push([
+        parsedName, parsedGender, checks[0][1].value, fmt(checks[1][1].value), fmt(checks[2][1].value),
+        fmt(kcalValue), fmt(checks[4][1].value), fmt(checks[5][1].value), fmt(checks[6][1].value),
+      ]);
+    }
+
+    // 人数 + 全员目标整体覆盖写入：减少人数时清除多余成员
+    await pool.execute(
+      `INSERT INTO user_profiles (user_id, people_count) VALUES (?, ?)
+       ON DUPLICATE KEY UPDATE people_count = VALUES(people_count)`,
+      [req.userId, peopleCount]
+    );
+    await pool.execute('DELETE FROM user_persons WHERE user_id = ? AND person_seq > ?', [req.userId, peopleCount]);
+    for (let i = 0; i < parsed.length; i++) {
+      await pool.execute(
+        `INSERT INTO user_persons (user_id, person_seq, name, gender, age, height_cm, weight_kg, target_kcal, target_carb, target_protein, target_fat)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE
+           name = VALUES(name), gender = VALUES(gender), age = VALUES(age),
+           height_cm = VALUES(height_cm), weight_kg = VALUES(weight_kg),
+           target_kcal = VALUES(target_kcal), target_carb = VALUES(target_carb),
+           target_protein = VALUES(target_protein), target_fat = VALUES(target_fat)`,
+        [req.userId, i + 1, ...parsed[i]]
+      );
+    }
+
+    res.json({ success: true, message: '目标保存成功' });
+  } catch (error) {
+    console.error('Error saving goals:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// 获取日期范围内每日总卡路里（用于迷你日历显示，必须在 /calories/:date 之前定义）
+router.get('/calories/range', async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+
+    if (!startDate || !endDate) {
+      return res.status(400).json({ success: false, message: 'startDate and endDate are required' });
+    }
+
+    const [rows] = await pool.execute(
+      `SELECT ce.entry_date, SUM(fi.energy_per_100 * ce.portion / 100) as total_kcal, COUNT(*) as entry_count
+       FROM calorie_entries ce
+       JOIN food_items fi ON fi.id = ce.food_id
+       WHERE ce.user_id = ? AND ce.entry_date BETWEEN ? AND ?
+       GROUP BY ce.entry_date ORDER BY ce.entry_date ASC`,
+      [req.userId, startDate, endDate]
+    );
+
+    const parsed = rows.map(r => ({
+      entry_date: r.entry_date,
+      total_kcal: Math.round(parseFloat(r.total_kcal || 0)),
+      entry_count: parseInt(r.entry_count)
+    }));
+    res.json({ success: true, data: parsed });
+  } catch (error) {
+    console.error('Error fetching calorie range:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// 获取指定日期的卡路里记录（含食物信息）
+router.get('/calories/:date', async (req, res) => {
+  try {
+    const { date } = req.params;
+    const [rows] = await pool.execute(
+      `SELECT ce.id, ce.entry_date, ce.meal_type, ce.portion, ce.food_id,
+              fi.name as food_name, fi.energy_per_100, fi.food_type,
+              fi.protein_per_100, fi.fat_per_100, fi.carb_per_100
+       FROM calorie_entries ce
+       JOIN food_items fi ON fi.id = ce.food_id
+       WHERE ce.user_id = ? AND ce.entry_date = ?
+       ORDER BY FIELD(ce.meal_type, 'breakfast', 'lunch', 'dinner', 'snack'), ce.created_at ASC`,
+      [req.userId, date]
+    );
+
+    const parseNum = v => (v === null || v === undefined) ? null : parseFloat(v);
+    const parsed = rows.map(r => ({
+      ...r,
+      portion: parseFloat(r.portion),
+      energy_per_100: parseFloat(r.energy_per_100),
+      protein_per_100: parseNum(r.protein_per_100),
+      fat_per_100: parseNum(r.fat_per_100),
+      carb_per_100: parseNum(r.carb_per_100),
+      kcal: Math.round(parseFloat(r.energy_per_100) * parseFloat(r.portion) / 100)
+    }));
+    res.json({ success: true, data: parsed });
+  } catch (error) {
+    console.error('Error fetching calorie entries:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// 添加卡路里记录
+router.post('/calories', async (req, res) => {
+  try {
+    const { entry_date, meal_type, food_id, portion } = req.body;
+
+    if (!entry_date || !food_id || portion === undefined || portion === null || portion === '') {
+      return res.status(400).json({ success: false, message: '缺少必填字段' });
+    }
+
+    if (!VALID_MEAL_TYPES.includes(meal_type)) {
+      return res.status(400).json({ success: false, message: '餐次类型无效' });
+    }
+
+    const portionNum = parseFloat(portion);
+    if (isNaN(portionNum) || portionNum <= 0) {
+      return res.status(400).json({ success: false, message: '分量必须大于 0' });
+    }
+    if (portionNum > 10000) {
+      return res.status(400).json({ success: false, message: '分量不能大于 10000 克/毫升' });
+    }
+
+    const [foods] = await pool.execute('SELECT id FROM food_items WHERE id = ?', [food_id]);
+    if (foods.length === 0) {
+      return res.status(400).json({ success: false, message: '食物不存在' });
+    }
+
+    const [result] = await pool.execute(
+      'INSERT INTO calorie_entries (user_id, entry_date, meal_type, food_id, portion) VALUES (?, ?, ?, ?, ?)',
+      [req.userId, entry_date, meal_type, food_id, portionNum]
+    );
+
+    res.status(201).json({
+      success: true,
+      message: '记录添加成功',
+      data: { id: result.insertId, entry_date, meal_type, food_id, portion: portionNum }
+    });
+  } catch (error) {
+    console.error('Error adding calorie entry:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// 更新卡路里记录（分量/餐次）
+router.put('/calories/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { portion, meal_type } = req.body;
+
+    const portionNum = parseFloat(portion);
+    if (isNaN(portionNum) || portionNum <= 0) {
+      return res.status(400).json({ success: false, message: '分量必须大于 0' });
+    }
+    if (portionNum > 10000) {
+      return res.status(400).json({ success: false, message: '分量不能大于 10000 克/毫升' });
+    }
+
+    const validMealType = VALID_MEAL_TYPES.includes(meal_type) ? meal_type : null;
+    if (!validMealType) {
+      return res.status(400).json({ success: false, message: '餐次类型无效' });
+    }
+
+    const [result] = await pool.execute(
+      'UPDATE calorie_entries SET portion = ?, meal_type = ? WHERE id = ? AND user_id = ?',
+      [portionNum, validMealType, id, req.userId]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ success: false, message: '记录不存在' });
+    }
+
+    res.json({ success: true, message: '记录更新成功' });
+  } catch (error) {
+    console.error('Error updating calorie entry:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// 删除卡路里记录
+router.delete('/calories/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    await pool.execute('DELETE FROM calorie_entries WHERE id = ? AND user_id = ?', [id, req.userId]);
+    res.json({ success: true, message: '记录删除成功' });
+  } catch (error) {
+    console.error('Error deleting calorie entry:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
 module.exports = router;

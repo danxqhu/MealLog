@@ -116,4 +116,97 @@ export const getFirstYear = async () => {
   return handleResponse(response);
 };
 
-export default { getMealsByDate, addMeal, updateMeal, deleteMeal, getMealsByRange, getRestaurants, getMonthlyStats, getMonthlyDailyStats, getQuarterlyStats, getQuarterlyWeeklyStats, getYearlyStats, getFirstYear };
+// ==================== 卡路里相关接口 ====================
+
+export const searchFoods = async (search) => {
+  const response = await fetch(
+    `${API_URL}/api/foods?search=${encodeURIComponent(search || '')}`,
+    { headers: getAuthHeaders() }
+  );
+  return handleResponse(response);
+};
+
+export const addFood = async (foodData) => {
+  const response = await fetch(`${API_URL}/api/foods`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(foodData),
+  });
+  return handleResponse(response);
+};
+
+export const updateFood = async (id, foodData) => {
+  const response = await fetch(`${API_URL}/api/foods/${id}`, {
+    method: 'PUT',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(foodData),
+  });
+  return handleResponse(response);
+};
+
+export const deleteFood = async (id) => {
+  const response = await fetch(`${API_URL}/api/foods/${id}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  });
+  return handleResponse(response);
+};
+
+export const getCaloriesByDate = async (date) => {
+  const response = await fetch(`${API_URL}/api/calories/${date}`, {
+    headers: getAuthHeaders(),
+  });
+  return handleResponse(response);
+};
+
+export const getCaloriesByRange = async (startDate, endDate) => {
+  const response = await fetch(
+    `${API_URL}/api/calories/range?startDate=${startDate}&endDate=${endDate}`,
+    { headers: getAuthHeaders() }
+  );
+  return handleResponse(response);
+};
+
+export const addCalorieEntry = async (entryData) => {
+  const response = await fetch(`${API_URL}/api/calories`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(entryData),
+  });
+  return handleResponse(response);
+};
+
+export const updateCalorieEntry = async (id, entryData) => {
+  const response = await fetch(`${API_URL}/api/calories/${id}`, {
+    method: 'PUT',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(entryData),
+  });
+  return handleResponse(response);
+};
+
+export const deleteCalorieEntry = async (id) => {
+  const response = await fetch(`${API_URL}/api/calories/${id}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  });
+  return handleResponse(response);
+};
+
+export const getGoals = async () => {
+  const response = await fetch(`${API_URL}/api/goals`, {
+    headers: getAuthHeaders(),
+  });
+  return handleResponse(response);
+};
+
+export const updateGoals = async (goalsData) => {
+  const response = await fetch(`${API_URL}/api/goals`, {
+    method: 'PUT',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(goalsData),
+  });
+  return handleResponse(response);
+};
+
+export default { getMealsByDate, addMeal, updateMeal, deleteMeal, getMealsByRange, getRestaurants, getMonthlyStats, getMonthlyDailyStats, getQuarterlyStats, getQuarterlyWeeklyStats, getYearlyStats, getFirstYear, searchFoods, addFood, updateFood, deleteFood, getCaloriesByDate, getCaloriesByRange, addCalorieEntry, updateCalorieEntry, deleteCalorieEntry, getGoals, updateGoals };
