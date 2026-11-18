@@ -4,8 +4,10 @@ frontend/node_modules/
 backend/node_modules/
 
 # Production build
-frontend/build/
-frontend/dist/
+# 不再忽略 build 产物：部署流程需要把 frontend/build 随代码一起推到 deploy 分支，
+# 避免每次都要 git add -f 导致遗漏。dist 同理。
+# frontend/build/
+# frontend/dist/
 
 # Environment variables
 .env
