@@ -10,6 +10,9 @@ import Register from './components/Register';
 import ForgotPassword from './components/ForgotPassword';
 import { getMealsByDate } from './api';
 
+// 发布版本号：每次部署前手动递增，用于确认服务器加载的是新构建产物
+const APP_VERSION = 'V1.0.2';
+
 function App() {
   const { user, loading, login, logout } = useAuth();
   const [authPage, setAuthPage] = useState('login'); // login, register, forgot
@@ -151,6 +154,8 @@ function App() {
           <StatsChart currentDate={currentDate} />
         )}
       </main>
+
+      <footer className="app-version">{APP_VERSION}</footer>
 
       {showModal && selectedDate && (
         <MealModal

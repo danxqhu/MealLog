@@ -119,3 +119,12 @@ main {
     padding: 0 8px;
   }
 }
+
+/* 页面底部发布版本号：部署后确认新旧版本的探针 */
+.app-version {
+  text-align: center;
+  font-size: 10px;
+  color: #c5b8ab;
+  padding: 6px 0 10px;
+  user-select: none;
+}
