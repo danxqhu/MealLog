@@ -446,6 +446,33 @@ const EntryRow = ({ entry, unit, onChanged }) => {
   );
 };
 
+// iOS Safari 键盘弹出时只压缩「视觉视口」，fixed bottom:0 的底部卡片不会被顶起会被键盘盖住；
+// 监听 visualViewport 算出键盘遮挡高度，由调用方写入 CSS 变量 --kb-offset 上抬卡片
+const useKeyboardInset = (active) => {
+  const [inset, setInset] = useState(0);
+
+  useEffect(() => {
+    if (!active) return undefined;
+    const vv = typeof window !== 'undefined' ? window.visualViewport : null;
+    if (!vv) return undefined;
+
+    const measure = () => {
+      const offset = Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop));
+      setInset(offset);
+    };
+    measure();
+    vv.addEventListener('resize', measure);
+    vv.addEventListener('scroll', measure);
+    return () => {
+      vv.removeEventListener('resize', measure);
+      vv.removeEventListener('scroll', measure);
+      setInset(0);
+    };
+  }, [active]);
+
+  return inset;
+};
+
 // 添加食物：搜索食物库 → 选中填分量；未找到可入库；面板以底部上滑卡片呈现
 const AddFoodControl = ({ mealKey, mealIcon, mealLabel, dateStr, unit, onSaved }) => {
   const [open, setOpen] = useState(false);
@@ -468,6 +495,14 @@ const AddFoodControl = ({ mealKey, mealIcon, mealLabel, dateStr, unit, onSaved }
 
   const searchTimerRef = useRef(null);
   const inputRef = useRef(null);
+  const keyboardInset = useKeyboardInset(open);
+
+  // 键盘弹起后让当前聚焦的输入框在卡片内可见（卡片本身靠 --kb-offset 上抬）
+  useEffect(() => {
+    if (!keyboardInset) return;
+    const el = document.activeElement;
+    if (el && el.scrollIntoView) el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }, [keyboardInset]);
 
   useEffect(() => {
     if (open && inputRef.current) inputRef.current.focus();
@@ -602,7 +637,7 @@ const AddFoodControl = ({ mealKey, mealIcon, mealLabel, dateStr, unit, onSaved }
   return (
     <>
       <div className="sheet-overlay" onClick={reset} />
-      <div className="add-food-sheet">
+      <div className="add-food-sheet" style={{ '--kb-offset': `${keyboardInset}px` }}>
         <div className="sheet-header">
           <span className="sheet-handle"></span>
           <div className="sheet-title-row">

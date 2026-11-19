@@ -11,7 +11,7 @@ import ForgotPassword from './components/ForgotPassword';
 import { getMealsByDate } from './api';
 
 // 发布版本号：每次部署前手动递增，用于确认服务器加载的是新构建产物
-const APP_VERSION = 'V1.0.2';
+const APP_VERSION = 'V1.0.3';
 
 function App() {
   const { user, loading, login, logout } = useAuth();
