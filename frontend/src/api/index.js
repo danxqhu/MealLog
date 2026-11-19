@@ -200,6 +200,15 @@ export const getGoals = async () => {
   return handleResponse(response);
 };
 
+// 每日合计热量目标历史（每天取当时生效的快照，修改目标不回溯影响过去日期）
+export const getGoalsHistory = async (startDate, endDate) => {
+  const response = await fetch(
+    `${API_URL}/api/goals/history?startDate=${startDate}&endDate=${endDate}`,
+    { headers: getAuthHeaders() }
+  );
+  return handleResponse(response);
+};
+
 export const updateGoals = async (goalsData) => {
   const response = await fetch(`${API_URL}/api/goals`, {
     method: 'PUT',

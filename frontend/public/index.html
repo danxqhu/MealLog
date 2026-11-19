@@ -2,13 +2,19 @@
 <html lang="zh-CN">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1.0, user-scalable=no" />
     <meta name="theme-color" content="#000000" />
     <title>饮食记录</title>
+    <script>
+      // iOS Safari 会忽略 user-scalable=no，用手势事件兑底禁止双指缩放
+      document.addEventListener('gesturestart', function (e) { e.preventDefault(); });
+      document.addEventListener('gesturechange', function (e) { e.preventDefault(); });
+    </script>
     <style>
       body {
         margin: 0;
         padding: 0;
+        touch-action: manipulation; /* 禁用双击缩放，保留快速连点 */
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
           'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
           sans-serif;

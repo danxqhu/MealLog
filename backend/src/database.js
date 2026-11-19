@@ -244,6 +244,20 @@ const initDatabase = async () => {
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     `);
 
+    // 创建 goal_history 目标历史快照表：每次保存目标且热量目标发生变化时写入一条生效记录，
+    // 过去日期的达标判断用「当时生效」的目标，后续修改目标不会回溯改变历史达标天数
+    await connection.execute(`
+      CREATE TABLE IF NOT EXISTS goal_history (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NOT NULL,
+        person_seq TINYINT NOT NULL,
+        effective_date DATE NOT NULL,
+        target_kcal DECIMAL(8, 2) DEFAULT NULL,
+        INDEX idx_history_user (user_id, person_seq, effective_date),
+        CONSTRAINT fk_history_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+
     // 创建 calorie_entries 每日卡路里记录表
     await connection.execute(`
       CREATE TABLE IF NOT EXISTS calorie_entries (
@@ -258,6 +272,19 @@ const initDatabase = async () => {
         CONSTRAINT fk_calorie_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
         CONSTRAINT fk_calorie_food FOREIGN KEY (food_id) REFERENCES food_items(id) ON DELETE CASCADE
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+
+    // 回填目标历史快照：现存目标补录一条，生效日为该账号最早的卡路里记录日，
+    // 保证功能上线前已记录的日子仍能按当前目标显示达标状态（从没记录过的账号不补）
+    await connection.execute(`
+      INSERT INTO goal_history (user_id, person_seq, effective_date, target_kcal)
+      SELECT p.user_id, p.person_seq, first_day.min_date, p.target_kcal
+      FROM user_persons p
+      JOIN (
+        SELECT user_id, MIN(entry_date) AS min_date FROM calorie_entries GROUP BY user_id
+      ) first_day ON first_day.user_id = p.user_id
+      WHERE p.target_kcal IS NOT NULL
+        AND NOT EXISTS (SELECT 1 FROM goal_history h WHERE h.user_id = p.user_id AND h.person_seq = p.person_seq)
     `);
 
     // 食物库为空时导入预置常见食物

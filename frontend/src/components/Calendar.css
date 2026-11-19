@@ -190,6 +190,35 @@
   display: block;
 }
 
+/* 热量达标/超标小字（来自卡路里页记录 vs 两人目标之和） */
+.calorie-status {
+  font-size: 10px;
+  font-weight: 700;
+  text-align: center;
+  white-space: nowrap;
+  line-height: 1.2;
+}
+
+.calorie-status.ok {
+  color: #1b5e20;
+}
+
+.calorie-status.over {
+  color: #c62828;
+}
+
+.legend-text-ok {
+  color: #1b5e20;
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.legend-text-over {
+  color: #c62828;
+  font-weight: 700;
+  font-size: 13px;
+}
+
 /* 免费用餐大面积显示 */
 .meal-free-area {
   display: flex;

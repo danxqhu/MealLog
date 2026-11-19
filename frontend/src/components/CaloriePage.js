@@ -11,6 +11,7 @@ import {
   updateCalorieEntry,
   deleteCalorieEntry,
   getGoals,
+  getGoalsHistory,
   updateGoals,
 } from '../api';
 
@@ -54,6 +55,8 @@ const CaloriePage = ({ currentDate, onMonthChange }) => {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [entries, setEntries] = useState([]);
   const [dayTotals, setDayTotals] = useState({});
+    // 每日生效的合计热量目标（历史快照）：key 为日期，修改目标不回溯影响过去日期
+    const [targetByDate, setTargetByDate] = useState({});
   const [refreshKey, setRefreshKey] = useState(0);
   const [showFoodAdmin, setShowFoodAdmin] = useState(false);
   const [showGoalModal, setShowGoalModal] = useState(false);
@@ -86,13 +89,23 @@ const CaloriePage = ({ currentDate, onMonthChange }) => {
       const startDate = `${year}-${String(month + 1).padStart(2, '0')}-01`;
       const endDate = `${year}-${String(month + 1).padStart(2, '0')}-${String(getDaysInMonth(year, month)).padStart(2, '0')}`;
       try {
-        const response = await getCaloriesByRange(startDate, endDate);
+        const [response, historyResp] = await Promise.all([
+          getCaloriesByRange(startDate, endDate),
+          getGoalsHistory(startDate, endDate).catch(() => null),
+        ]);
         if (response.success) {
           const totals = {};
           response.data.forEach(item => {
             totals[item.entry_date] = item.total_kcal;
           });
           setDayTotals(totals);
+        }
+        if (historyResp && historyResp.success) {
+          const targets = {};
+          historyResp.data.forEach(item => {
+            targets[item.date] = item.combined_target_kcal;
+          });
+          setTargetByDate(targets);
         }
       } catch (error) {
         console.error('Error loading calorie totals:', error);
@@ -170,13 +183,22 @@ const CaloriePage = ({ currentDate, onMonthChange }) => {
   const combinedKcalTarget = persons.every(p => p && p.target_kcal !== null && p.target_kcal !== undefined)
     ? persons.reduce((s, p) => s + parseFloat(p.target_kcal), 0)
     : null;
-  const combinedOver = combinedKcalTarget !== null && dayTotal.kcal > combinedKcalTarget;
+  // 当天生效的合计热量目标：过去日期用历史快照，今天及以后用当前设置
+  const isTodayOrFuture = selectedDateStr >= todayStr;
+  const dayTarget = isTodayOrFuture ? combinedKcalTarget : (targetByDate[selectedDateStr] ?? null);
+  const dayCombinedOver = dayTarget !== null && dayTotalKcal > dayTarget;
 
   // ==================== 迷你日历 ====================
   const renderMiniCalendar = () => {
     const daysInMonth = getDaysInMonth(year, month);
     const firstDay = getFirstDayOfMonth(year, month);
     const cells = [];
+
+    // 本月达标统计：只算有卡路里记录且当天目标已生效的天，避免未记录/无目标天数污染百分比
+    const targetForDay = d => (d >= todayStr ? combinedKcalTarget : (targetByDate[d] ?? null));
+    const recordedDays = Object.keys(dayTotals).filter(d => Number(dayTotals[d]) > 0 && targetForDay(d) !== null);
+    const goalOkDays = recordedDays.filter(d => Number(dayTotals[d]) <= targetForDay(d)).length;
+    const goalOkPct = recordedDays.length > 0 ? Math.round((goalOkDays / recordedDays.length) * 100) : 0;
 
     for (let i = 0; i < firstDay; i++) {
       cells.push(<div key={`empty-${i}`} className="mini-day empty"></div>);
@@ -187,6 +209,11 @@ const CaloriePage = ({ currentDate, onMonthChange }) => {
       const total = dayTotals[dateStr];
       const classes = ['mini-day'];
       if (total) classes.push('has-data');
+      // 当天生效目标（历史快照）存在时，用淡绿/淡红底色标记当日是否超标
+      const dayGoalTarget = targetForDay(dateStr);
+      if (total && dayGoalTarget !== null && dayGoalTarget !== undefined) {
+        classes.push(total > dayGoalTarget ? 'goal-over' : 'goal-ok');
+      }
       if (dateStr === todayStr) classes.push('today');
       if (dateStr === selectedDateStr) classes.push('selected');
 
@@ -232,6 +259,15 @@ const CaloriePage = ({ currentDate, onMonthChange }) => {
           {['日', '一', '二', '三', '四', '五', '六'].map(w => <div key={w}>{w}</div>)}
         </div>
         <div className="calorie-mini-grid">{cells}</div>
+        {recordedDays.length > 0 && (
+          <div className="calendar-legend">
+            <span className="legend-stats">本月达标 {goalOkDays}/{recordedDays.length}天 · {goalOkPct}%</span>
+            <span className="legend-right">
+              <span className="legend-item"><span className="legend-dot ok"></span>达标</span>
+              <span className="legend-item"><span className="legend-dot over"></span>超标</span>
+            </span>
+          </div>
+        )}
       </div>
     );
   };
@@ -258,6 +294,8 @@ const CaloriePage = ({ currentDate, onMonthChange }) => {
 
         <AddFoodControl
           mealKey={meal.key}
+          mealIcon={meal.icon}
+          mealLabel={meal.label}
           dateStr={selectedDateStr}
           unit={unit}
           onSaved={refresh}
@@ -270,17 +308,17 @@ const CaloriePage = ({ currentDate, onMonthChange }) => {
     <div className="calorie-container">
       {renderMiniCalendar()}
 
-      <div className={`calorie-day-summary ${combinedOver ? 'over' : ''}`}>
+      <div className={`calorie-day-summary ${dayCombinedOver ? 'over' : ''}`}>
         <span className="summary-date">{selectedDateStr}</span>
         <span className="summary-total">
           当日合计：{dayTotalKcal ? formatEnergy(dayTotalKcal, unit) : '暂无记录'}
-          {combinedKcalTarget !== null && (
+          {dayTarget !== null && (
             <span className="summary-target">
-              {' '}/ {peopleCount}人目标 {formatEnergy(combinedKcalTarget, unit)}
+              {' '}/ {peopleCount}人目标 {formatEnergy(dayTarget, unit)}
             </span>
           )}
-          {combinedOver && <span className="summary-badge over">⚠️ 超标</span>}
-          {!combinedOver && combinedKcalTarget !== null && dayTotalKcal > 0 && (
+          {dayCombinedOver && <span className="summary-badge over">⚠️ 超标</span>}
+          {!dayCombinedOver && dayTarget !== null && dayTotalKcal > 0 && (
             <span className="summary-badge ok">✓ 达标</span>
           )}
         </span>
@@ -408,8 +446,8 @@ const EntryRow = ({ entry, unit, onChanged }) => {
   );
 };
 
-// 添加食物：搜索食物库 → 选中填分量；未找到可入库
-const AddFoodControl = ({ mealKey, dateStr, unit, onSaved }) => {
+// 添加食物：搜索食物库 → 选中填分量；未找到可入库；面板以底部上滑卡片呈现
+const AddFoodControl = ({ mealKey, mealIcon, mealLabel, dateStr, unit, onSaved }) => {
   const [open, setOpen] = useState(false);
   const [searchText, setSearchText] = useState('');
   const [results, setResults] = useState([]);
@@ -562,7 +600,17 @@ const AddFoodControl = ({ mealKey, dateStr, unit, onSaved }) => {
   const noResults = searchText.trim() && results.length === 0;
 
   return (
-    <div className="add-food-panel">
+    <>
+      <div className="sheet-overlay" onClick={reset} />
+      <div className="add-food-sheet">
+        <div className="sheet-header">
+          <span className="sheet-handle"></span>
+          <div className="sheet-title-row">
+            <span className="sheet-title">{mealIcon} {mealLabel} · 添加食物</span>
+            <button className="sheet-close" onClick={reset}>✕</button>
+          </div>
+        </div>
+        <div className="add-food-panel">
       <input
         ref={inputRef}
         type="text"
@@ -575,7 +623,12 @@ const AddFoodControl = ({ mealKey, dateStr, unit, onSaved }) => {
       {!selectedFood && !showCreateForm && (
         <ul className="food-results">
           {results.map(food => (
-            <li key={food.id} onClick={() => { setSelectedFood(food); setError(''); }}>
+            <li key={food.id} onClick={() => {
+              setSelectedFood(food);
+              setError('');
+              // 自动带入该食物上次记录的分量，免去重复输入
+              setPortion(food.last_portion ? String(food.last_portion) : '');
+            }}>
               <div className="food-result-info">
                 <span className="food-result-name">{food.name}</span>
                 {formatMacros(food) && <span className="food-result-macros">{formatMacros(food)}</span>}
@@ -703,6 +756,9 @@ const AddFoodControl = ({ mealKey, dateStr, unit, onSaved }) => {
           <span className="portion-preview">
             {previewKcal > 0 ? `≈ ${formatEnergy(previewKcal, unit)}` : `请输入${selectedFood.food_type === 'liquid' ? '毫升' : '克'}数`}
           </span>
+          {selectedFood.last_portion ? (
+            <span className="portion-last-hint">已填上次 {parseFloat(selectedFood.last_portion)}{selectedFood.food_type === 'liquid' ? '毫升' : '克'}</span>
+          ) : null}
         </div>
       )}
 
@@ -718,7 +774,9 @@ const AddFoodControl = ({ mealKey, dateStr, unit, onSaved }) => {
         </button>
         <button className="btn-secondary" onClick={reset}>取消</button>
       </div>
-    </div>
+        </div>
+      </div>
+    </>
   );
 };
 

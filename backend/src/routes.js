@@ -369,33 +369,36 @@ router.get('/stats/first-year', async (req, res) => {
 const KCAL_PER_KJ = 1 / 4.184; // 1 kJ = 0.239 kcal
 const VALID_MEAL_TYPES = ['breakfast', 'lunch', 'dinner', 'snack'];
 
-// 搜索食物库（全局共享），排序：精确匹配 > 当前用户最近使用时间 > 名称字母序
+// 搜索食物库（全局共享），排序：精确匹配 > 当前用户最近使用时间 > 名称字母序；附带当前用户上次记录的分量
 router.get('/foods', async (req, res) => {
   try {
     const search = (req.query.search || '').trim();
     const userId = req.userId;
     const foodColumns = 'f.id, f.name, f.energy_per_100, f.food_type, f.protein_per_100, f.fat_per_100, f.carb_per_100';
+    const lastPortionSql = `(SELECT c2.portion FROM calorie_entries c2
+       WHERE c2.food_id = f.id AND c2.user_id = ?
+       ORDER BY c2.created_at DESC, c2.id DESC LIMIT 1) AS last_portion`;
     let rows;
     if (search) {
       [rows] = await pool.execute(
-        `SELECT ${foodColumns}, MAX(c.created_at) AS last_used
+        `SELECT ${foodColumns}, MAX(c.created_at) AS last_used, ${lastPortionSql}
          FROM food_items f
          LEFT JOIN calorie_entries c ON c.food_id = f.id AND c.user_id = ?
          WHERE f.name LIKE ?
          GROUP BY f.id
          ORDER BY (f.name = ?) DESC, last_used DESC, f.name ASC
          LIMIT 30`,
-        [userId, `%${search}%`, search]
+        [userId, userId, `%${search}%`, search]
       );
     } else {
       [rows] = await pool.execute(
-        `SELECT ${foodColumns}, MAX(c.created_at) AS last_used
+        `SELECT ${foodColumns}, MAX(c.created_at) AS last_used, ${lastPortionSql}
          FROM food_items f
          LEFT JOIN calorie_entries c ON c.food_id = f.id AND c.user_id = ?
          GROUP BY f.id
          ORDER BY last_used DESC, f.name ASC
          LIMIT 30`,
-        [userId]
+        [userId, userId]
       );
     }
     const parseNum = v => (v === null || v === undefined) ? null : parseFloat(v);
@@ -404,7 +407,8 @@ router.get('/foods', async (req, res) => {
       energy_per_100: parseNum(r.energy_per_100),
       protein_per_100: parseNum(r.protein_per_100),
       fat_per_100: parseNum(r.fat_per_100),
-      carb_per_100: parseNum(r.carb_per_100)
+      carb_per_100: parseNum(r.carb_per_100),
+      last_portion: parseNum(r.last_portion)
     }));
     res.json({ success: true, data: parsed });
   } catch (error) {
@@ -707,6 +711,26 @@ router.put('/goals', async (req, res) => {
       ]);
     }
 
+    // 目标历史快照：热量目标与最近一条快照相比有变化时，以今天为生效日新增一条；
+    // 过去日期的达标判断从此不受后续修改影响
+    const [todayRows] = await pool.execute('SELECT CURRENT_DATE AS d');
+    const effectiveDate = todayRows[0].d;
+    for (let i = 0; i < parsed.length; i++) {
+      const newKcal = parsed[i][5]; // 换算后的 kcal，可能为 null
+      const [latest] = await pool.execute(
+        'SELECT target_kcal FROM goal_history WHERE user_id = ? AND person_seq = ? ORDER BY effective_date DESC, id DESC LIMIT 1',
+        [req.userId, i + 1]
+      );
+      const oldKcal = latest.length === 0 ? undefined : (latest[0].target_kcal === null ? null : parseFloat(latest[0].target_kcal));
+      const newNum = newKcal === null ? null : parseFloat(newKcal);
+      if (latest.length === 0 || (oldKcal === null ? null : Number(oldKcal)) !== newNum) {
+        await pool.execute(
+          'INSERT INTO goal_history (user_id, person_seq, effective_date, target_kcal) VALUES (?, ?, ?, ?)',
+          [req.userId, i + 1, effectiveDate, newKcal]
+        );
+      }
+    }
+
     // 人数 + 全员目标整体覆盖写入：减少人数时清除多余成员
     await pool.execute(
       `INSERT INTO user_profiles (user_id, people_count) VALUES (?, ?)
@@ -760,6 +784,66 @@ router.get('/calories/range', async (req, res) => {
     res.json({ success: true, data: parsed });
   } catch (error) {
     console.error('Error fetching calorie range:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// 获取日期范围内每日的两人合计热量目标（kcal）：每天取「当时生效」的历史快照之和，
+// 某成员当天尚无生效快照或没设目标时返回 null（该天不参与达标判断）
+router.get('/goals/history', async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+    if (!startDate || !endDate) {
+      return res.status(400).json({ success: false, message: 'startDate and endDate are required' });
+    }
+
+    const [dateRows] = await pool.execute(
+      `SELECT DISTINCT ce.entry_date AS d
+       FROM calorie_entries ce
+       WHERE ce.user_id = ? AND ce.entry_date BETWEEN ? AND ?
+       UNION
+       SELECT DISTINCT effective_date AS d
+       FROM goal_history
+       WHERE user_id = ? AND effective_date <= ?
+       ORDER BY d`,
+      [req.userId, startDate, endDate, req.userId, endDate]
+    );
+
+    const result = [];
+    for (const row of dateRows) {
+      const d = row.d instanceof Date
+        ? `${row.d.getFullYear()}-${String(row.d.getMonth() + 1).padStart(2, '0')}-${String(row.d.getDate()).padStart(2, '0')}`
+        : String(row.d);
+      const [targetRows] = await pool.execute(
+        `SELECT s.person_seq, s.target_kcal
+         FROM goal_history s
+         JOIN (SELECT person_seq, MAX(effective_date) AS eff
+               FROM goal_history
+               WHERE user_id = ? AND effective_date <= ?
+               GROUP BY person_seq) latest
+           ON latest.person_seq = s.person_seq AND latest.eff = s.effective_date
+         WHERE s.user_id = ?`,
+        [req.userId, d, req.userId]
+      );
+      const bySeq = {};
+      targetRows.forEach(r => {
+        bySeq[parseInt(r.person_seq)] = r.target_kcal === null ? null : parseFloat(r.target_kcal);
+      });
+      const [profileRows] = await pool.execute('SELECT people_count FROM user_profiles WHERE user_id = ?', [req.userId]);
+      const peopleCount = profileRows.length === 0 ? 2 : parseInt(profileRows[0].people_count);
+      let combined = 0;
+      let complete = true;
+      for (let seq = 1; seq <= peopleCount; seq++) {
+        const v = bySeq[seq];
+        if (v === null || v === undefined) { complete = false; break; }
+        combined += v;
+      }
+      result.push({ date: d, combined_target_kcal: complete ? Math.round(combined) : null });
+    }
+
+    res.json({ success: true, data: result });
+  } catch (error) {
+    console.error('Error fetching goals history:', error);
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });

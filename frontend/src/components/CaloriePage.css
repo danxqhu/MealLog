@@ -145,16 +145,36 @@
 .person-card {
   border: 1px solid #f0e2d6;
   border-radius: 8px;
-  padding: 7px 9px;
-  margin-top: 6px;
+  padding: 10px 12px;
+  margin-top: 8px;
   background: #fffdfb;
+  /* 行间距由 flex gap 统一控制，避免拥挤 */
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .person-card-title {
   font-size: 12px;
   font-weight: 700;
   color: #f0844a;
-  margin-bottom: 4px;
+}
+
+/* 目标弹窗内统一三列对齐：标签 / 输入框 / 单位各自成一条竖线 */
+.person-card .create-food-label {
+  min-width: 70px;
+}
+
+.person-card .create-food-row input {
+  flex: 1;
+  min-width: 0;
+  max-width: 150px;
+  padding: 4px 8px;
+}
+
+.person-card .create-food-per {
+  min-width: 64px;
+  font-size: 11px;
 }
 
 /* ==================== 食物库编辑弹窗 ==================== */
@@ -807,6 +827,16 @@
   padding: 6px 8px;
 }
 
+/* 上次分量自动带入提示 */
+.portion-last-hint {
+  font-size: 10px;
+  color: #2e7d32;
+  background: #e8f5e9;
+  border-radius: 6px;
+  padding: 1px 6px;
+  white-space: nowrap;
+}
+
 .selected-food-name {
   color: #333;
   font-weight: 600;
@@ -875,16 +905,16 @@
   .goal-button,
   .food-admin-button {
     padding: 3px 5px;
-    font-size: 10px;
+    font-size: 11px;
   }
 
   .unit-toggle {
-    font-size: 10px;
+    font-size: 11px;
   }
 
   .unit-toggle button {
     padding: 3px 4px;
-    font-size: 10px;
+    font-size: 11px;
   }
 
   /* 窄屏单位切换只显示 kcal/kJ，保证操作栏一行放下 */
@@ -907,20 +937,20 @@
   }
 
   .mini-day {
-    min-height: 16px;
+    min-height: 18px;
     padding: 0 1px;
   }
 
   .mini-day-number {
-    font-size: 7px;
+    font-size: 8px;
   }
 
   .mini-day-kcal {
-    font-size: 6px;
+    font-size: 7px;
   }
 
   .calorie-weekdays div {
-    font-size: 7px;
+    font-size: 8px;
   }
 
   .calorie-day-summary {
@@ -934,30 +964,30 @@
   }
 
   .person-goal-name {
-    font-size: 9px;
+    font-size: 10px;
   }
 
   .person-goal-item {
-    font-size: 8px;
+    font-size: 9px;
     padding: 1px 3px;
     border-radius: 6px;
   }
 
   .summary-date {
-    font-size: 11px;
+    font-size: 12px;
   }
 
   .summary-total {
-    font-size: 11px;
+    font-size: 12px;
   }
 
   .summary-target {
-    font-size: 10px;
+    font-size: 11px;
     margin-left: 2px;
   }
 
   .summary-badge {
-    font-size: 9px;
+    font-size: 10px;
     padding: 1px 5px;
     margin-left: 3px;
   }
@@ -968,26 +998,198 @@
   }
 
   .meal-section-title {
-    font-size: 12px;
+    font-size: 13px;
   }
 
   .meal-section-total {
-    font-size: 11px;
+    font-size: 12px;
   }
 
   .entry-row {
-    font-size: 11px;
+    font-size: 12px;
     padding: 1px 3px;
     gap: 4px;
   }
 
   .entry-kcal {
     min-width: 52px;
-    font-size: 11px;
+    font-size: 12px;
   }
 
   .add-food-button {
     padding: 3px 0;
-    font-size: 11px;
+    font-size: 12px;
+  }
+}
+
+/* 日历达标/超标色块：两人热量目标都设置后生效，淡色系不刺眼 */
+.mini-day.has-data.goal-ok {
+  background: #e6f4e7;
+  border: 1px solid #b7ddb9;
+}
+
+.mini-day.has-data.goal-over {
+  background: #fdeaea;
+  border: 1px solid #f3b8b4;
+}
+
+.mini-day.has-data.goal-over .mini-day-kcal {
+  color: #c62828;
+}
+
+/* 日历底部：左侧本月达标统计 + 右侧达标/超标图例 */
+.calendar-legend {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin-top: 4px;
+  font-size: 10px;
+  color: #999;
+}
+
+.legend-stats {
+  font-weight: 600;
+  color: #666;
+  white-space: nowrap;
+}
+
+.legend-right {
+  display: inline-flex;
+  gap: 10px;
+  margin-left: auto;
+}
+
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  display: inline-block;
+}
+
+.legend-dot.ok {
+  background: #b7ddb9;
+}
+
+.legend-dot.over {
+  background: #f3b8b4;
+}
+
+/* 添加食物：底部上滑卡片（bottom sheet），约占半屏 */
+.sheet-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 1000;
+  animation: sheet-fade 0.25s ease;
+}
+
+.add-food-sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1001;
+  background: #fffdfa;
+  border-radius: 16px 16px 0 0;
+  box-shadow: 0 -6px 24px rgba(0, 0, 0, 0.18);
+  max-height: 62vh;
+  overflow-y: auto;
+  padding: 6px 14px 16px;
+  animation: sheet-up 0.28s ease;
+  -webkit-overflow-scrolling: touch;
+}
+
+@keyframes sheet-up {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+@keyframes sheet-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.sheet-header {
+  position: sticky;
+  top: 0;
+  background: #fffdfa;
+  padding: 2px 0 6px;
+  z-index: 1;
+}
+
+.sheet-handle {
+  display: block;
+  width: 36px;
+  height: 4px;
+  border-radius: 2px;
+  background: #ddd;
+  margin: 0 auto 6px;
+}
+
+.sheet-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.sheet-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #333;
+}
+
+.sheet-close {
+  background: transparent;
+  border: none;
+  font-size: 14px;
+  color: #888;
+  cursor: pointer;
+  padding: 2px 8px;
+  border-radius: 6px;
+}
+
+/* 卡片内的面板去掉自带的边框底色，由卡片统一承载 */
+.add-food-sheet .add-food-panel {
+  border: none;
+  background: transparent;
+  padding: 0;
+  border-radius: 0;
+}
+
+/* 桌面端卡片居中限宽 */
+@media (min-width: 769px) {
+  .add-food-sheet {
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
+    width: 560px;
+    border-radius: 16px 16px 0 0;
+  }
+
+  @keyframes sheet-up {
+    from { transform: translate(-50%, 100%); }
+    to { transform: translate(-50%, 0); }
+  }
+}
+
+@media (max-width: 768px) {
+  .add-food-sheet {
+    max-height: 68vh;
+    padding: 4px 10px 12px;
+  }
+
+  .calendar-legend {
+    font-size: 9px;
+  }
+
+  .legend-stats {
+    font-size: 9px;
   }
 }
