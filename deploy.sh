@@ -31,16 +31,27 @@ echo ""
 # 服务器只需克隆 deploy 分支，本脚本自动同步到远程最新再部署。
 # 使用 fetch + reset --hard：deploy 分支允许强推重写历史，ff-only 拉取会失败。
 # .env 是未跟踪文件，reset --hard 不会动它。
+# 拉取失败 = 本地是旧代码，继续部署只会原样重发旧版，直接中止不做后续步骤。
 # 若在 git 仓库外运行（例如直接上传的文件），则跳过拉取。
 if git rev-parse --git-dir &> /dev/null; then
     echo "[0/6] 拉取最新发布代码..."
     CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
-    if git fetch -q origin "$CURRENT_BRANCH" 2>/dev/null && git rev-parse --verify --quiet "origin/$CURRENT_BRANCH" > /dev/null; then
-        git reset --hard -q "origin/$CURRENT_BRANCH"
-        echo "  已同步到 origin/$CURRENT_BRANCH 最新代码"
-    else
-        echo "  警告: 无法连接远程仓库，使用当前本地代码继续部署"
+    # 保留并展示真实报错（权限/网络/认证），不再静默吞掉
+    if ! FETCH_ERR=$(git fetch origin "$CURRENT_BRANCH" 2>&1); then
+        echo ""
+        echo "  ❌ 错误: 拉取 origin/$CURRENT_BRANCH 失败，已中止部署（未停服、未重建，线上保持现状）"
+        echo "  git 报错信息:"
+        echo "$FETCH_ERR" | sed 's/^/    /'
+        echo "  常见原因: .git 目录权限混乱（混用 root/ubuntu 操作过 git）、网络不通 GitHub、凭据失效"
+        echo "  权限类问题可执行: sudo chown -R ubuntu:ubuntu $(pwd)"
+        echo "  也可手动同步后重试: git fetch origin $CURRENT_BRANCH && git reset --hard origin/$CURRENT_BRANCH"
+        exit 1
     fi
+    if ! git reset --hard -q "origin/$CURRENT_BRANCH"; then
+        echo "  ❌ 错误: 重置到 origin/$CURRENT_BRANCH 失败（可能有文件属主/权限问题），已中止部署"
+        exit 1
+    fi
+    echo "  已同步到 origin/$CURRENT_BRANCH 最新代码: $(git log --oneline -1)"
     echo ""
 else
     echo "[0/6] 非 git 仓库，跳过代码拉取"
