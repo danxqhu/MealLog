@@ -10,8 +10,9 @@ import Register from './components/Register';
 import ForgotPassword from './components/ForgotPassword';
 import { getMealsByDate } from './api';
 
-// 发布版本号：每次部署前手动递增，用于确认服务器加载的是新构建产物
-const APP_VERSION = 'V1.0.3';
+// 发布版本号：每次部署前手动递增，用于确认服务器加载的是新构建产物；旁边同步更新发布时间（北京时间）
+const APP_VERSION = 'V1.0.4';
+const APP_RELEASE_TIME = '2026.11.19 16:51';
 
 function App() {
   const { user, loading, login, logout } = useAuth();
@@ -155,7 +156,7 @@ function App() {
         )}
       </main>
 
-      <footer className="app-version">{APP_VERSION}</footer>
+      <footer className="app-version">版本号 {APP_VERSION} · 更新时间 {APP_RELEASE_TIME}</footer>
 
       {showModal && selectedDate && (
         <MealModal

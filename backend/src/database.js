@@ -258,6 +258,21 @@ const initDatabase = async () => {
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     `);
 
+    // 创建 weight_logs 体重称重记录表（减重目标链路数据源：每两周称一次、每期减 2%；
+    // 同一成员同一天重复提交按更新处理，目标与达标状态由前端按记录链推导，不落库）
+    await connection.execute(`
+      CREATE TABLE IF NOT EXISTS weight_logs (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NOT NULL,
+        person_seq TINYINT NOT NULL,
+        weigh_date DATE NOT NULL,
+        weight_kg DECIMAL(5, 1) NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY uk_weight_person_date (user_id, person_seq, weigh_date),
+        CONSTRAINT fk_weight_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+
     // 创建 calorie_entries 每日卡路里记录表
     await connection.execute(`
       CREATE TABLE IF NOT EXISTS calorie_entries (

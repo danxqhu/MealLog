@@ -13,9 +13,65 @@ import {
   getGoals,
   getGoalsHistory,
   updateGoals,
+  getWeights,
+  addWeight,
+  deleteWeight,
 } from '../api';
 
 const KCAL_TO_KJ = 4.184;
+
+// 减重规则：每隔两周的周三称重，每期目标 = 上次实际体重 ×（1 - 2%）
+const WEIGHT_INTERVAL_DAYS = 14;
+const WEIGHT_LOSS_RATE = 0.02;
+
+const round1 = (v) => Math.round(v * 10) / 10;
+
+// 'YYYY-MM-DD' → 本地时区 Date（避免 UTC 偏移）
+const parseDateStr = (s) => {
+  const [y, m, d] = s.split('-').map(Number);
+  return new Date(y, m - 1, d);
+};
+
+// 日期字符串加天数，返回 'YYYY-MM-DD'
+const addDaysToStr = (s, days) => {
+  const dt = parseDateStr(s);
+  dt.setDate(dt.getDate() + days);
+  return formatDateStr(dt);
+};
+
+// 两日期相差天数（to - from）
+const daysBetween = (from, to) => Math.round((parseDateStr(to) - parseDateStr(from)) / 86400000);
+
+const WEEKDAY_LABELS = ['日', '一', '二', '三', '四', '五', '六'];
+
+// '2026-07-15' → '7月15日 周三'
+const formatWeightDate = (s) => {
+  const dt = parseDateStr(s);
+  return `${dt.getMonth() + 1}月${dt.getDate()}日 周${WEEKDAY_LABELS[dt.getDay()]}`;
+};
+
+// '2026-07-15' → '7/15'（页面横条窄屏用）
+const formatShortDate = (s) => {
+  const dt = parseDateStr(s);
+  return `${dt.getMonth() + 1}/${dt.getDate()}`;
+};
+
+// 按某成员的称重记录生成减重链路：首条为基线；之后每次目标 = 上次实际体重 ×98%，
+// 实际 ≤ 目标即达标；末尾给出下次称重日与目标体重
+const buildWeightPlan = (logs) => {
+  const sorted = [...logs].sort((a, b) => a.weigh_date.localeCompare(b.weigh_date));
+  const records = sorted.map((log, idx) => {
+    if (idx === 0) return { ...log, target: null, achieved: null };
+    const target = round1(sorted[idx - 1].weight_kg * (1 - WEIGHT_LOSS_RATE));
+    return { ...log, target, achieved: log.weight_kg <= target + 1e-9 };
+  });
+  const last = sorted[sorted.length - 1] || null;
+  return {
+    records,
+    nextTarget: last ? round1(last.weight_kg * (1 - WEIGHT_LOSS_RATE)) : null,
+    nextDate: last ? addDaysToStr(last.weigh_date, WEIGHT_INTERVAL_DAYS) : null,
+  };
+};
 
 const MEAL_TYPES = [
   { key: 'breakfast', label: '早餐', icon: '🥣' },
@@ -61,6 +117,9 @@ const CaloriePage = ({ currentDate, onMonthChange }) => {
   const [showFoodAdmin, setShowFoodAdmin] = useState(false);
   const [showGoalModal, setShowGoalModal] = useState(false);
   const [goals, setGoals] = useState(null);
+  // 减重目标：称重记录与明细弹窗
+  const [weightLogs, setWeightLogs] = useState([]);
+  const [showWeightModal, setShowWeightModal] = useState(false);
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
@@ -142,6 +201,19 @@ const CaloriePage = ({ currentDate, onMonthChange }) => {
     loadGoals();
   }, [refreshKey, showGoalModal]);
 
+  // 加载称重记录（弹窗保存/删除后或页面数据刷新时重新拉取）
+  useEffect(() => {
+    const loadWeights = async () => {
+      try {
+        const response = await getWeights();
+        if (response.success) setWeightLogs(response.data);
+      } catch (error) {
+        console.error('Error loading weight logs:', error);
+      }
+    };
+    loadWeights();
+  }, [refreshKey, showWeightModal]);
+
   // 数据变更后刷新
   const refresh = () => setRefreshKey(k => k + 1);
 
@@ -187,6 +259,14 @@ const CaloriePage = ({ currentDate, onMonthChange }) => {
   const isTodayOrFuture = selectedDateStr >= todayStr;
   const dayTarget = isTodayOrFuture ? combinedKcalTarget : (targetByDate[selectedDateStr] ?? null);
   const dayCombinedOver = dayTarget !== null && dayTotalKcal > dayTarget;
+
+  // 减重目标链路：按启用的成员各自推导下次目标与到期提醒
+  const personList = persons.map((p, idx) => ({ seq: idx + 1, name: p?.name || `成员${idx + 1}` }));
+  const weightPlans = personList.map(({ seq, name }) => ({
+    seq,
+    name,
+    plan: buildWeightPlan(weightLogs.filter(l => l.person_seq === seq)),
+  }));
 
   // ==================== 迷你日历 ====================
   const renderMiniCalendar = () => {
@@ -272,6 +352,32 @@ const CaloriePage = ({ currentDate, onMonthChange }) => {
     );
   };
 
+  // ==================== 减重目标横条（日历下方，点击展开明细弹窗）====================
+  const renderWeightBar = () => (
+    <div className="weight-goal-bar" onClick={() => setShowWeightModal(true)} title="点击查看减重明细">
+      <span className="weight-bar-title">⚖️ 减重目标</span>
+      {weightPlans.map(({ seq, name, plan }) => {
+        const overdue = plan.nextDate !== null && todayStr >= plan.nextDate;
+        const overdueDays = overdue ? daysBetween(plan.nextDate, todayStr) : 0;
+        return (
+          <span className={`weight-chip ${overdue ? 'due' : ''}`} key={seq}>
+            <span className="weight-chip-name">{name}</span>
+            {plan.nextTarget !== null ? (
+              <>
+                <span className="weight-chip-target">下次目标 {plan.nextTarget} kg</span>
+                <span className="weight-chip-date">（{formatShortDate(plan.nextDate)}）</span>
+                {overdue && <span className="weight-chip-badge">{overdueDays === 0 ? '今日称重' : `逾期${overdueDays}天`}</span>}
+              </>
+            ) : (
+              <span className="weight-chip-date">未记录体重</span>
+            )}
+          </span>
+        );
+      })}
+      <span className="weight-bar-more">明细 ›</span>
+    </div>
+  );
+
   // ==================== 餐次区块 ====================
   const renderMealSection = (meal) => {
     const mealEntries = entriesByMeal[meal.key];
@@ -307,6 +413,7 @@ const CaloriePage = ({ currentDate, onMonthChange }) => {
   return (
     <div className="calorie-container">
       {renderMiniCalendar()}
+      {renderWeightBar()}
 
       <div className={`calorie-day-summary ${dayCombinedOver ? 'over' : ''}`}>
         <span className="summary-date">{selectedDateStr}</span>
@@ -370,6 +477,14 @@ const CaloriePage = ({ currentDate, onMonthChange }) => {
         <div className="food-admin-overlay" onClick={() => setShowGoalModal(false)}>
           <div className="food-admin-modal" onClick={(e) => e.stopPropagation()}>
             <GoalModal unit={unit} onClose={() => setShowGoalModal(false)} onSaved={refresh} />
+          </div>
+        </div>
+      )}
+
+      {showWeightModal && (
+        <div className="food-admin-overlay" onClick={() => setShowWeightModal(false)}>
+          <div className="food-admin-modal weight-modal" onClick={(e) => e.stopPropagation()}>
+            <WeightModal personList={personList} logs={weightLogs} todayStr={todayStr} onClose={() => setShowWeightModal(false)} onSaved={refresh} />
           </div>
         </div>
       )}
@@ -1287,6 +1402,208 @@ const GoalModal = ({ unit, onClose, onSaved }) => {
             {saving ? '保存中…' : '保存目标'}
           </button>
           <button className="btn-secondary" onClick={onClose}>取消</button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// 减重目标明细弹窗：按成员展示历史称重记录与每期达标结果，支持补录/修正/删除
+const WeightModal = ({ personList, logs, todayStr, onClose, onSaved }) => {
+  const [form, setForm] = useState({ seq: personList[0]?.seq || 1, date: todayStr, weight: '' });
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+  const [saving, setSaving] = useState(false);
+  // 历史记录折叠：默认只展示近 3 个月，按成员记住展开状态
+  const [expandedSeqs, setExpandedSeqs] = useState({});
+  const dateInputRef = useRef(null);
+
+  // 近 3 个月分界日（早于该日的记录默认折叠）
+  const recentCutoff = (() => {
+    const dt = parseDateStr(todayStr);
+    dt.setMonth(dt.getMonth() - 3);
+    return formatDateStr(dt);
+  })();
+
+  // 点击日期整行唤出日历：输入框自身由 CSS 热区铺满处理，
+  // 行内其余区域（标签/空白）走 showPicker；不支持的浏览器回退为点击输入框本身
+  const handleDateRowClick = (e) => {
+    const input = dateInputRef.current;
+    if (!input || e.target === input) return;
+    try {
+      input.focus();
+      if (typeof input.showPicker === 'function') input.showPicker();
+    } catch (err) {
+      // 无用户激活等场景下 showPicker 会抛错，忽略即可
+    }
+  };
+
+  const nameOf = (seq) => personList.find(p => p.seq === seq)?.name || `成员${seq}`;
+
+  const handleSave = async () => {
+    const w = parseFloat(form.weight);
+    if (!form.date) {
+      setError('请选择称重日期');
+      return;
+    }
+    if (isNaN(w) || w < 20 || w > 500) {
+      setError('体重需在 20-500 公斤之间');
+      return;
+    }
+    setSaving(true);
+    setError('');
+    try {
+      const response = await addWeight({ person_seq: form.seq, weigh_date: form.date, weight_kg: round1(w) });
+      if (response.success) {
+        setNotice(`已记录 ${nameOf(form.seq)} ${form.date} 体重 ${round1(w)} kg`);
+        setForm(f => ({ ...f, weight: '' }));
+        onSaved();
+      } else {
+        setError(response.message || '保存失败');
+      }
+    } catch (err) {
+      setError('保存失败，请重试');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (log, name) => {
+    if (!window.confirm(`确定删除 ${name} ${log.weigh_date} 的体重记录吗？\n\n删除后目标链路会按剩余记录重新计算。`)) return;
+    try {
+      await deleteWeight(log.id);
+      onSaved();
+    } catch (err) {
+      console.error('Error deleting weight log:', err);
+    }
+  };
+
+  const renderPersonBlock = ({ seq, name }) => {
+    const plan = buildWeightPlan(logs.filter(l => l.person_seq === seq));
+    const overdue = plan.nextDate !== null && todayStr >= plan.nextDate;
+    const overdueDays = overdue ? daysBetween(plan.nextDate, todayStr) : 0;
+    const rows = [...plan.records].reverse(); // 最新在前
+    const isExpanded = !!expandedSeqs[seq];
+    // 折叠时只保留近 3 个月记录（全部早于 3 个月时至少留最近一条，避免默认视图空白）
+    const recentCount = rows.length > 0
+      ? Math.max(rows.filter(r => r.weigh_date >= recentCutoff).length, 1)
+      : 0;
+    const collapsedHidden = rows.length - recentCount;
+    const shownRows = isExpanded ? rows : rows.slice(0, recentCount);
+    return (
+      <div className="weight-person-block" key={seq}>
+        <div className="weight-person-title">👤 {name}</div>
+        {/* 下次目标固定在成员块顶部，避免与历史记录的时序混淆 */}
+        {plan.nextTarget !== null && (
+          <div className={`weight-next-card ${overdue ? 'due' : ''}`}>
+            <span className="weight-next-main">下次称重 {formatWeightDate(plan.nextDate)}</span>
+            <span className="weight-next-hint">
+              {overdue
+                ? (overdueDays === 0 ? '今日应称重' : `已逾期 ${overdueDays} 天`)
+                : `还有 ${daysBetween(todayStr, plan.nextDate)} 天`}
+            </span>
+            <span className="weight-next-target">目标 ≤ {plan.nextTarget} kg</span>
+          </div>
+        )}
+        {rows.length === 0 ? (
+          <div className="weight-empty">填写下方表单记录第一次体重，作为减重基线（首期目标 = 基线 ×98%）</div>
+        ) : (
+          <table className="weight-history-table">
+            <thead>
+              <tr>
+                <th>称重日期</th>
+                <th>目标 kg</th>
+                <th>实际 kg</th>
+                <th>结果</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+            {shownRows.map(r => (
+              <tr key={r.id}>
+                <td>{formatWeightDate(r.weigh_date)}</td>
+                <td>{r.target === null ? '-' : r.target}</td>
+                <td className="weight-actual">{r.weight_kg}</td>
+                <td>
+                  {r.achieved === null
+                    ? <span className="weight-result baseline">基线</span>
+                    : <span className={`weight-result ${r.achieved ? 'ok' : 'over'}`}>{r.achieved ? '✓ 达标' : '✕ 未达标'}</span>}
+                </td>
+                <td><button className="weight-del" onClick={() => handleDelete(r, name)} title="删除该记录">✕</button></td>
+              </tr>
+            ))}
+              {collapsedHidden > 0 && (
+                <tr className="weight-expand-row">
+                  <td colSpan="5">
+                    <button onClick={() => setExpandedSeqs(s => ({ ...s, [seq]: !isExpanded }))}>
+                      {isExpanded ? '▴ 收起更早记录' : `▾ 展开更早 ${collapsedHidden} 条记录`}
+                    </button>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <div className="food-admin-body weight-modal-body">
+      <div className="food-admin-header">
+        <h3>⚖️ 减重目标</h3>
+        <button className="modal-close" onClick={onClose} title="关闭">✕</button>
+      </div>
+
+      <div className="admin-note">
+        ℹ️ 减重规则：每隔两周的周三称重，每期目标 = 上次体重 ×98%（减 2%），到期未称重会提醒
+      </div>
+
+      {personList.map(renderPersonBlock)}
+
+      <div className="weight-add-form">
+        <div className="weight-add-title">📝 记录体重</div>
+        <div className="create-food-row">
+          <span className="create-food-label">成员</span>
+          <div className="segment-toggle">
+            {personList.map(p => (
+              <button key={p.seq} className={form.seq === p.seq ? 'active' : ''} onClick={() => { setForm(f => ({ ...f, seq: p.seq })); setNotice(''); }}>{p.name}</button>
+            ))}
+          </div>
+        </div>
+        <div className="create-food-row weight-date-row" onClick={handleDateRowClick}>
+          <span className="create-food-label">日期</span>
+          <span className="weight-date-wrap">
+            <input
+              ref={dateInputRef}
+              type="date"
+              className="weight-date-input"
+              value={form.date}
+              max={todayStr}
+              onChange={(e) => { setForm(f => ({ ...f, date: e.target.value })); setNotice(''); }}
+            />
+            <span className="weight-date-icon">📅</span>
+          </span>
+        </div>
+        <div className="create-food-row">
+          <span className="create-food-label required">体重</span>
+          <input
+            type="number"
+            value={form.weight}
+            min="20"
+            max="500"
+            step="0.1"
+            placeholder="公斤"
+            onChange={(e) => { setForm(f => ({ ...f, weight: e.target.value })); setNotice(''); }}
+          />
+          <span className="create-food-per">kg</span>
+        </div>
+        {error && <div className="entry-error">{error}</div>}
+        {notice && <div className="admin-success-notice">{notice}</div>}
+        <div className="create-food-actions">
+          <button className="btn-primary" onClick={handleSave} disabled={saving}>
+            {saving ? '保存中…' : '记录体重'}
+          </button>
         </div>
       </div>
     </div>

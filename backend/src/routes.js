@@ -848,6 +848,88 @@ router.get('/goals/history', async (req, res) => {
   }
 });
 
+// ==================== 减重目标（体重称重记录）接口 ====================
+
+// 获取当前账号的全部称重记录（目标链路由前端按记录顺序推导）
+router.get('/weights', async (req, res) => {
+  try {
+    const [rows] = await pool.execute(
+      'SELECT id, person_seq, weigh_date, weight_kg FROM weight_logs WHERE user_id = ? ORDER BY weigh_date ASC',
+      [req.userId]
+    );
+    res.json({
+      success: true,
+      data: rows.map(r => ({
+        id: r.id,
+        person_seq: parseInt(r.person_seq),
+        weigh_date: r.weigh_date,
+        weight_kg: parseFloat(r.weight_kg)
+      }))
+    });
+  } catch (error) {
+    console.error('Error fetching weight logs:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// 新增/更新称重记录（同一成员同一天重复提交视为修正体重）
+router.post('/weights', async (req, res) => {
+  try {
+    const { person_seq, weigh_date, weight_kg } = req.body;
+
+    const seq = parseInt(person_seq);
+    if (!Number.isInteger(seq) || seq < 1 || seq > 2) {
+      return res.status(400).json({ success: false, message: '成员序号无效' });
+    }
+    const [profiles] = await pool.execute('SELECT people_count FROM user_profiles WHERE user_id = ?', [req.userId]);
+    const peopleCount = profiles.length === 0 ? 2 : parseInt(profiles[0].people_count);
+    if (seq > peopleCount) {
+      return res.status(400).json({ success: false, message: `该成员未启用，当前记录人数为 ${peopleCount} 人` });
+    }
+
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(weigh_date || '')) {
+      return res.status(400).json({ success: false, message: '称重日期格式应为 YYYY-MM-DD' });
+    }
+
+    const weight = parseFloat(weight_kg);
+    if (isNaN(weight) || weight < 20 || weight > 500) {
+      return res.status(400).json({ success: false, message: '体重需在 20-500 公斤之间' });
+    }
+
+    await pool.execute(
+      `INSERT INTO weight_logs (user_id, person_seq, weigh_date, weight_kg) VALUES (?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE weight_kg = VALUES(weight_kg)`,
+      [req.userId, seq, weigh_date, weight.toFixed(1)]
+    );
+
+    const [rows] = await pool.execute(
+      'SELECT id, person_seq, weigh_date, weight_kg FROM weight_logs WHERE user_id = ? AND person_seq = ? AND weigh_date = ?',
+      [req.userId, seq, weigh_date]
+    );
+    const log = rows[0];
+    res.status(201).json({
+      success: true,
+      message: '体重记录保存成功',
+      data: { id: log.id, person_seq: parseInt(log.person_seq), weigh_date: log.weigh_date, weight_kg: parseFloat(log.weight_kg) }
+    });
+  } catch (error) {
+    console.error('Error saving weight log:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// 删除称重记录（删除后剩余记录重新推导目标链路）
+router.delete('/weights/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    await pool.execute('DELETE FROM weight_logs WHERE id = ? AND user_id = ?', [id, req.userId]);
+    res.json({ success: true, message: '体重记录删除成功' });
+  } catch (error) {
+    console.error('Error deleting weight log:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
 // 获取指定日期的卡路里记录（含食物信息）
 router.get('/calories/:date', async (req, res) => {
   try {

@@ -218,4 +218,30 @@ export const updateGoals = async (goalsData) => {
   return handleResponse(response);
 };
 
-export default { getMealsByDate, addMeal, updateMeal, deleteMeal, getMealsByRange, getRestaurants, getMonthlyStats, getMonthlyDailyStats, getQuarterlyStats, getQuarterlyWeeklyStats, getYearlyStats, getFirstYear, searchFoods, addFood, updateFood, deleteFood, getCaloriesByDate, getCaloriesByRange, addCalorieEntry, updateCalorieEntry, deleteCalorieEntry, getGoals, updateGoals };
+// ==================== 减重目标（体重称重记录）接口 ====================
+
+export const getWeights = async () => {
+  const response = await fetch(`${API_URL}/api/weights`, {
+    headers: getAuthHeaders(),
+  });
+  return handleResponse(response);
+};
+
+export const addWeight = async (weightData) => {
+  const response = await fetch(`${API_URL}/api/weights`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(weightData),
+  });
+  return handleResponse(response);
+};
+
+export const deleteWeight = async (id) => {
+  const response = await fetch(`${API_URL}/api/weights/${id}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  });
+  return handleResponse(response);
+};
+
+export default { getMealsByDate, addMeal, updateMeal, deleteMeal, getMealsByRange, getRestaurants, getMonthlyStats, getMonthlyDailyStats, getQuarterlyStats, getQuarterlyWeeklyStats, getYearlyStats, getFirstYear, searchFoods, addFood, updateFood, deleteFood, getCaloriesByDate, getCaloriesByRange, addCalorieEntry, updateCalorieEntry, deleteCalorieEntry, getGoals, updateGoals, getWeights, addWeight, deleteWeight };
